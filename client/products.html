@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shop all products — Norda</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <main class="container section">
+    <div class="breadcrumb"><a href="index.html">Home</a> / Shop</div>
+    <div class="products-layout">
+      <aside class="filters">
+        <h3>Categories</h3>
+        <ul class="filters-list" id="filter-categories">
+          <li><a href="products.html" data-cat="">All categories</a></li>
+        </ul>
+
+        <h3>Price range</h3>
+        <form id="price-form">
+          <div class="field">
+            <label for="min-price">Min price</label>
+            <input type="number" id="min-price" min="0" placeholder="0" />
+          </div>
+          <div class="field">
+            <label for="max-price">Max price</label>
+            <input type="number" id="max-price" min="0" placeholder="500" />
+          </div>
+          <button type="submit" class="btn btn-outline btn-sm btn-block">Apply</button>
+        </form>
+      </aside>
+
+      <div>
+        <div class="toolbar">
+          <span id="result-count">Loading products…</span>
+          <select id="sort-select">
+            <option value="newest">Newest</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="top_rated">Top rated</option>
+          </select>
+        </div>
+        <div id="product-grid" class="product-grid"></div>
+        <div id="pagination" class="pagination"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/products-render.js"></script>
+  <script src="js/products.js"></script>
+</body>
+</html>

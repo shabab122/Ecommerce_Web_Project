@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Norda — Everyday shopping, sorted</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header id="site-header"></header>
+
+  <section class="hero">
+    <div class="hero-inner container">
+      <div>
+        <h1>Everything you need, nothing you don't.</h1>
+        <p>Norda curates electronics, fashion, home essentials, sports gear and books into one straightforward shop — fair prices, honest descriptions, fast checkout.</p>
+        <div class="hero-ctas">
+          <a href="products.html" class="btn btn-primary">Browse all products</a>
+          <a href="products.html?featured=true" class="btn btn-outline">See featured picks</a>
+        </div>
+      </div>
+      <div class="hero-stack">
+        <div class="hero-card"><span class="label">Free shipping</span><span class="num">$50+</span></div>
+        <div class="hero-card"><span class="label">Return window</span><span class="num">14 days</span></div>
+        <div class="hero-card"><span class="label">Categories</span><span class="num" id="stat-categories">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="section">
+      <div class="section-head">
+        <h2>Shop by category</h2>
+      </div>
+      <div id="category-strip" class="category-strip">
+        <span class="spinner">Loading categories…</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Featured picks</h2>
+        <a href="products.html?featured=true">View all &rarr;</a>
+      </div>
+      <div id="featured-grid" class="product-grid">
+        <span class="spinner">Loading products…</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>New arrivals</h2>
+        <a href="products.html?sort=newest">View all &rarr;</a>
+      </div>
+      <div id="new-grid" class="product-grid">
+        <span class="spinner">Loading products…</span>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/products-render.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

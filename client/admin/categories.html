@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Categories — Norda Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/admin.css" />
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar" id="admin-sidebar"></aside>
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <h1>Categories</h1>
+        <button class="btn btn-primary btn-sm" id="new-category-btn">+ New category</button>
+      </div>
+      <div id="alert-box"></div>
+      <div id="categories-root">
+        <span class="spinner">Loading categories…</span>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay hidden" id="category-modal">
+    <div class="modal-box">
+      <h2 id="modal-title">New category</h2>
+      <form id="category-form">
+        <input type="hidden" id="category-id" />
+        <div class="field">
+          <label for="category-name">Name</label>
+          <input type="text" id="category-name" required />
+        </div>
+        <div class="field">
+          <label for="category-image">Image URL (optional)</label>
+          <input type="text" id="category-image" placeholder="https://..." />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline btn-sm" id="cancel-category-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="admin-layout.js"></script>
+  <script src="categories.js"></script>
+</body>
+</html>
