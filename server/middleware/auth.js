@@ -8,8 +8,8 @@ const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
     token = authHeader.split(" ")[1];
-  } else if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
+  } else if (req.cookies && req.cookies.norda_token) {
+    token = req.cookies.norda_token;
   }
 
   if (!token) {
@@ -23,6 +23,7 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: "Not authorized, user no longer exists" });
     }
     req.user = user;
+    req.auth = { id: user._id.toString(), email: user.email, role: user.role };
     next();
   } catch (error) {
     return res.status(401).json({ message: "Not authorized, invalid or expired token" });

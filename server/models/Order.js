@@ -3,9 +3,10 @@ const mongoose = require("mongoose");
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-    name: String,
+    name: { type: String, required: true },
     quantity: { type: Number, required: true },
     price: { type: Number, required: true },
+    image: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -16,20 +17,39 @@ const orderSchema = new mongoose.Schema(
     items: [orderItemSchema],
     shippingAddress: {
       line1: String,
+      line2: String,
       city: String,
+      district: String,
       postCode: String,
+      country: { type: String, default: "Bangladesh" },
       phone: String,
     },
-    paymentMethod: { type: String, enum: ["cod", "card"], default: "cod" },
+    subtotal: { type: Number, required: true, min: 0, default: 0 },
+    shippingFee: { type: Number, required: true, min: 0, default: 0 },
+    paymentMethod: { type: String, enum: ["cod", "sslcommerz"], default: "cod" },
     totalAmount: { type: Number, required: true },
+    currency: { type: String, default: "BDT", uppercase: true },
     status: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
     isPaid: { type: Boolean, default: false },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed", "cancelled"],
+      default: "pending",
+    },
+    transactionId: { type: String, default: "", index: true },
+    paidAt: Date,
+    stockRestored: { type: Boolean, default: false },
+    cancelledAt: Date,
+    cancelReason: { type: String, default: "", maxlength: 300 },
   },
   { timestamps: true }
 );
+
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);

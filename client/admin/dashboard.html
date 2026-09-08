@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
   <link rel="stylesheet" href="../css/admin.css" />
 </head>
@@ -13,8 +13,8 @@
     <aside class="admin-sidebar" id="admin-sidebar"></aside>
     <main class="admin-main">
       <div class="admin-topbar">
-        <h1>Dashboard</h1>
-        <span id="admin-topbar-user"></span>
+        <div><span class="eyebrow">Store pulse</span><h1>Overview</h1><p>Catalog, sales and fulfillment at a glance.</p></div>
+        <div class="admin-topbar-actions"><span id="admin-topbar-user"></span><button class="btn btn-primary btn-sm" id="export-orders-btn">Export orders CSV</button></div>
       </div>
       <div id="dashboard-root">
         <span class="spinner">Loading dashboard…</span>

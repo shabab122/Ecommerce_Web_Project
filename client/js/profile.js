@@ -1,0 +1,83 @@
+document.addEventListener("DOMContentLoaded", async () => {
+  renderHeader("profile");
+  renderFooter();
+  if (!requireLogin()) return;
+  await loadProfile();
+});
+
+async function loadProfile() {
+  const root = document.getElementById("profile-root");
+  try {
+    const profile = await Api.get("/auth/profile");
+    const address = profile.address || {};
+    root.innerHTML = `
+      <div class="profile-layout">
+        <aside class="profile-summary">
+          <span class="avatar">${escapeHtml(profile.name.charAt(0).toUpperCase())}</span>
+          <h2>${escapeHtml(profile.name)}</h2>
+          <p>${escapeHtml(profile.email)}</p>
+          <a href="orders.html" class="text-link">View orders & invoices →</a>
+        </aside>
+        <form id="profile-form" class="checkout-card">
+          <div class="checkout-card-head"><span>01</span><div><h2>Contact details</h2><p>Your email address is used to identify your account.</p></div></div>
+          <div id="profile-alert" aria-live="polite"></div>
+          <div class="form-grid two">
+            <div class="field">
+              <label for="profile-name">Full name</label>
+              <input id="profile-name" type="text" required maxlength="80" value="${escapeHtml(profile.name)}" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="profile-email">Email</label>
+              <input id="profile-email" type="email" value="${escapeHtml(profile.email)}" disabled />
+            </div>
+          </div>
+          <hr class="form-divider" />
+          <div class="checkout-card-head"><span>02</span><div><h2>Default delivery address</h2><p>Checkout can update these details later.</p></div></div>
+          <div class="form-grid two">
+            <div class="field field-wide"><label for="profile-line1">Street address</label><input id="profile-line1" type="text" maxlength="120" value="${escapeHtml(address.line1 || "")}" /></div>
+            <div class="field field-wide"><label for="profile-line2">Apartment or landmark <span>Optional</span></label><input id="profile-line2" type="text" maxlength="120" value="${escapeHtml(address.line2 || "")}" /></div>
+            <div class="field"><label for="profile-city">City</label><input id="profile-city" type="text" maxlength="60" value="${escapeHtml(address.city || "")}" /></div>
+            <div class="field"><label for="profile-district">District</label><input id="profile-district" type="text" maxlength="60" value="${escapeHtml(address.district || "")}" /></div>
+            <div class="field"><label for="profile-postcode">Postal code</label><input id="profile-postcode" type="text" maxlength="20" value="${escapeHtml(address.postCode || "")}" /></div>
+            <div class="field"><label for="profile-phone">Phone</label><input id="profile-phone" type="tel" maxlength="20" value="${escapeHtml(address.phone || "")}" /></div>
+            <div class="field field-wide"><label for="profile-country">Country</label><input id="profile-country" type="text" maxlength="60" value="${escapeHtml(address.country || "Bangladesh")}" /></div>
+          </div>
+          <button class="btn btn-primary" type="submit" id="save-profile">Save profile</button>
+        </form>
+      </div>
+    `;
+
+    document.getElementById("profile-form").addEventListener("submit", saveProfile);
+  } catch (error) {
+    root.innerHTML = `<div class="empty-state"><h2>Profile unavailable</h2><p>${escapeHtml(error.message)}</p></div>`;
+  }
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const button = document.getElementById("save-profile");
+  const alert = document.getElementById("profile-alert");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  try {
+    const updated = await Api.put("/auth/profile", {
+      name: document.getElementById("profile-name").value.trim(),
+      address: {
+        line1: document.getElementById("profile-line1").value.trim(),
+        line2: document.getElementById("profile-line2").value.trim(),
+        city: document.getElementById("profile-city").value.trim(),
+        district: document.getElementById("profile-district").value.trim(),
+        postCode: document.getElementById("profile-postcode").value.trim(),
+        phone: document.getElementById("profile-phone").value.trim(),
+        country: document.getElementById("profile-country").value.trim() || "Bangladesh",
+      },
+    });
+    Api.setSession(updated);
+    alert.innerHTML = `<div class="alert alert-success">Profile saved.</div>`;
+  } catch (error) {
+    alert.innerHTML = `<div class="alert alert-error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Save profile";
+  }
+}

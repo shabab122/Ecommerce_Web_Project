@@ -4,49 +4,71 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!requireLogin()) return;
 
   const params = new URLSearchParams(window.location.search);
-  const justPlaced = params.get("placed");
-  await loadOrders(justPlaced);
+  await loadOrders(params.get("placed"), params.get("invoice"));
 });
 
-async function loadOrders(justPlaced) {
+async function loadOrders(justPlaced, invoiceNumber) {
   const root = document.getElementById("orders-root");
   try {
     const orders = await Api.get("/orders/my");
-
-    let banner = "";
-    if (justPlaced) {
-      banner = `<div class="alert alert-success">Order placed successfully! Order ID: ${escapeHtml(justPlaced)}</div>`;
-    }
+    const banner = justPlaced
+      ? `<div class="order-confirmation"><span aria-hidden="true">✓</span><div><strong>Order placed successfully</strong><p>We reserved your items and created ${invoiceNumber ? `invoice ${escapeHtml(invoiceNumber)}` : "an invoice"}. Payment and delivery updates appear below.</p></div></div>`
+      : "";
 
     if (orders.length === 0) {
-      root.innerHTML = `${banner}<div class="empty-state">You haven't placed any orders yet. <a href="products.html">Start shopping</a>.</div>`;
+      root.innerHTML = `${banner}<div class="empty-state"><h2>No orders yet</h2><p>Your future orders and invoices will appear here.</p><a class="btn btn-primary" href="products.html">Start shopping</a></div>`;
       return;
     }
 
-    root.innerHTML =
-      banner +
-      orders
-        .map(
-          (o) => `
-        <div class="order-card">
-          <div class="order-head">
-            <div>
-              <strong>Order #${o._id.slice(-8).toUpperCase()}</strong>
-              <div style="font-size:0.85rem;color:var(--ink-soft);">${new Date(o.createdAt).toLocaleString()}</div>
-            </div>
-            <span class="status-pill status-${o.status}">${o.status}</span>
-          </div>
-          ${o.items
-            .map((i) => `<div class="order-line"><span>${escapeHtml(i.name)} × ${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`)
-            .join("")}
-          <div class="order-line" style="font-weight:700;border-top:1px solid var(--border);padding-top:10px;margin-top:6px;">
-            <span>Total</span><span>${money(o.totalAmount)}</span>
-          </div>
-        </div>
-      `
-        )
-        .join("");
-  } catch (e) {
-    root.innerHTML = `<div class="empty-state">Could not load orders: ${escapeHtml(e.message)}</div>`;
+    root.innerHTML = banner + orders.map(renderOrder).join("");
+  } catch (error) {
+    root.innerHTML = `<div class="empty-state"><h2>Orders unavailable</h2><p>${escapeHtml(error.message)}</p></div>`;
   }
+}
+
+function renderOrder(order) {
+  const shortId = order._id.slice(-8).toUpperCase();
+  const address = order.shippingAddress || {};
+  return `
+    <article class="order-card">
+      <header class="order-head">
+        <div>
+          <span class="eyebrow">Order #${shortId}</span>
+          <h2>${formatDate(order.createdAt, true)}</h2>
+        </div>
+        <div class="order-statuses">
+          <span class="status-pill status-${escapeHtml(order.status)}">${escapeHtml(order.status)}</span>
+          <span class="status-pill payment-${escapeHtml(order.paymentStatus)}">${escapeHtml(paymentLabel(order.paymentStatus))}</span>
+        </div>
+      </header>
+      <div class="order-body">
+        <div class="order-products">
+          ${order.items
+            .map(
+              (item) => `
+                <div class="order-product">
+                  <a class="order-product-image" href="product-detail.html?id=${encodeURIComponent(item.product)}">
+                    ${item.image ? `<img src="${escapeHtml(resolveImage(item.image))}" alt="" />` : `<span>${escapeHtml(item.name.charAt(0))}</span>`}
+                  </a>
+                  <div>
+                    <a href="product-detail.html?id=${encodeURIComponent(item.product)}"><strong>${escapeHtml(item.name)}</strong></a>
+                    <small>Quantity ${item.quantity} · ${money(item.price)} each</small>
+                    ${order.status === "delivered" ? `<a class="text-link" href="product-detail.html?id=${encodeURIComponent(item.product)}#reviews">Write a review</a>` : ""}
+                  </div>
+                  <strong>${money(item.price * item.quantity)}</strong>
+                </div>`
+            )
+            .join("")}
+        </div>
+        <aside class="order-summary">
+          <div><span>Payment method</span><strong>${order.paymentMethod === "sslcommerz" ? "SSLCOMMERZ" : "Cash on delivery"}</strong></div>
+          <div><span>Deliver to</span><strong>${escapeHtml([address.city, address.district].filter(Boolean).join(", ") || "Saved address")}</strong></div>
+          <div><span>Subtotal</span><strong>${money(order.subtotal)}</strong></div>
+          <div><span>Delivery</span><strong>${order.shippingFee ? money(order.shippingFee) : "Free"}</strong></div>
+          <div class="order-total"><span>Total</span><strong>${money(order.totalAmount)}</strong></div>
+          <a class="btn btn-outline btn-sm btn-block" href="invoice.html?orderId=${encodeURIComponent(order._id)}">Open invoice</a>
+        </aside>
+      </div>
+      ${order.status === "cancelled" && order.cancelReason ? `<p class="order-note"><strong>Cancellation note:</strong> ${escapeHtml(order.cancelReason)}</p>` : ""}
+    </article>`;
 }

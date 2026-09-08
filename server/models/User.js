@@ -3,10 +3,13 @@ const bcrypt = require("bcryptjs");
 
 const addressSchema = new mongoose.Schema(
   {
-    line1: String,
-    city: String,
-    postCode: String,
-    phone: String,
+    line1: { type: String, trim: true, maxlength: 120 },
+    line2: { type: String, trim: true, maxlength: 120 },
+    city: { type: String, trim: true, maxlength: 60 },
+    district: { type: String, trim: true, maxlength: 60 },
+    postCode: { type: String, trim: true, maxlength: 20 },
+    country: { type: String, trim: true, maxlength: 60, default: "Bangladesh" },
+    phone: { type: String, trim: true, maxlength: 20 },
   },
   { _id: false }
 );
@@ -17,6 +20,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please add a name"],
       trim: true,
+      maxlength: 80,
     },
     email: {
       type: String,
@@ -28,7 +32,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Please add a password"],
-      minlength: 6,
+      minlength: 8,
       select: false,
     },
     role: {

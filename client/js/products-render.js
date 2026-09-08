@@ -1,38 +1,48 @@
-/** Builds the HTML for one product card, shared by home + shop pages. */
-function productCardHtml(p) {
-  const hasDiscount = p.discountPrice && p.discountPrice > 0 && p.discountPrice < p.price;
-  const shownPrice = hasDiscount ? p.discountPrice : p.price;
-  const img = p.images && p.images.length ? `<img src="${resolveImage(p.images[0])}" alt="${escapeHtml(p.name)}" />` : `<span>${escapeHtml(p.name)}</span>`;
-  const catName = p.category && p.category.name ? p.category.name : "";
+function productCardHtml(product) {
+  const discounted =
+    product.discountPrice > 0 && Number(product.discountPrice) < Number(product.price);
+  const displayedPrice = discounted ? product.discountPrice : product.price;
+  const category = product.category?.name || "Everyday";
+  const brand = product.brandRef?.name || product.brand || "Norda selection";
+  const imageUrl = product.images?.length ? resolveImage(product.images[0]) : "";
+  const initials = product.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
 
-  let stockNote = "";
-  if (p.stock === 0) stockNote = `<span class="stock-out">Out of stock</span>`;
-  else if (p.stock <= 5) stockNote = `<span class="stock-low">Only ${p.stock} left</span>`;
+  let stock = `<span class="stock-ready">In stock</span>`;
+  if (product.stock === 0) stock = `<span class="stock-out">Out of stock</span>`;
+  else if (product.stock <= 5) {
+    stock = `<span class="stock-low">Only ${product.stock} left</span>`;
+  }
 
   return `
-    <a class="product-card" href="product-detail.html?id=${p._id}">
-      <div class="product-thumb">
-        ${hasDiscount ? `<span class="tag">Sale</span>` : ""}
-        ${img}
-      </div>
+    <article class="product-card">
+      <a class="product-thumb" href="product-detail.html?id=${encodeURIComponent(product._id)}" aria-label="View ${escapeHtml(product.name)}">
+        ${discounted ? `<span class="tag">Save ${Math.round((1 - product.discountPrice / product.price) * 100)}%</span>` : ""}
+        ${
+          imageUrl
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
+            : `<div class="product-fallback"><span>${escapeHtml(initials)}</span><small>${escapeHtml(category)}</small></div>`
+        }
+      </a>
       <div class="product-info">
-        <span class="product-cat">${escapeHtml(catName)}</span>
-        <span class="product-name">${escapeHtml(p.name)}</span>
-        <div class="product-price">
-          <span class="price-now">${money(shownPrice)}</span>
-          ${hasDiscount ? `<span class="price-old">${money(p.price)}</span>` : ""}
+        <div class="product-eyebrow">
+          <span>${escapeHtml(category)}</span>
+          <span>${escapeHtml(brand)}</span>
         </div>
-        ${p.ratingCount ? `<span class="rating">★ ${p.ratingAverage.toFixed(1)} (${p.ratingCount})</span>` : ""}
-        ${stockNote}
+        <a class="product-name" href="product-detail.html?id=${encodeURIComponent(product._id)}">${escapeHtml(product.name)}</a>
+        <div class="product-price">
+          <span class="price-now">${money(displayedPrice)}</span>
+          ${discounted ? `<span class="price-old">${money(product.price)}</span>` : ""}
+        </div>
+        <div class="product-card-meta">
+          <span class="rating">${product.ratingCount ? "★ " + Number(product.ratingAverage).toFixed(1) + " (" + product.ratingCount + ")" : "New arrival"}</span>
+          ${stock}
+        </div>
       </div>
-    </a>
+    </article>
   `;
-}
-
-function resolveImage(path) {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  // uploaded images are served from the API server's /uploads path
-  const base = API_BASE_URL.replace(/\/api$/, "");
-  return `${base}${path}`;
 }

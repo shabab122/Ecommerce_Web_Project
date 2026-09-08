@@ -10,14 +10,23 @@ if (!fs.existsSync(uploadDir)) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const extensions = {
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/webp": ".webp",
+      "image/gif": ".gif",
+    };
+    cb(null, unique + (extensions[file.mimetype] || ""));
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|webp|gif/;
-  const ok = allowed.test(path.extname(file.originalname).toLowerCase());
+  const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  const allowedExtensions = new Set([".jpeg", ".jpg", ".png", ".webp", ".gif"]);
+  const ok =
+    allowedMimeTypes.has(file.mimetype) &&
+    allowedExtensions.has(path.extname(file.originalname).toLowerCase());
   if (ok) return cb(null, true);
   cb(new Error("Only image files (jpeg, jpg, png, webp, gif) are allowed"));
 };

@@ -1,5 +1,8 @@
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const { isPositiveInteger } = require("../utils/validation");
+
+const cartProductFields = "name images price discountPrice stock";
 
 const getOrCreateCart = async (userId) => {
   let cart = await Cart.findOne({ user: userId });
@@ -7,88 +10,113 @@ const getOrCreateCart = async (userId) => {
   return cart;
 };
 
-// @route GET /api/cart
-const getCart = async (req, res) => {
+const getCart = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product",
-      "name images price discountPrice stock"
+      cartProductFields
     );
-    res.json(cart || { user: req.user._id, items: [] });
+    if (!cart) return res.json({ user: req.user._id, items: [] });
+    let pricesChanged = false;
+    for (const item of cart.items) {
+      if (!item.product) continue;
+      const currentPrice =
+        item.product.discountPrice > 0 && item.product.discountPrice < item.product.price
+          ? item.product.discountPrice
+          : item.product.price;
+      if (item.price !== currentPrice) {
+        item.price = currentPrice;
+        pricesChanged = true;
+      }
+    }
+    if (pricesChanged) await cart.save();
+    res.json(cart);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route POST /api/cart  { productId, quantity }
-const addToCart = async (req, res) => {
+const addToCart = async (req, res, next) => {
   try {
-    const { productId, quantity = 1 } = req.body;
-    const product = await Product.findById(productId);
+    const quantity = Number(req.body.quantity ?? 1);
+    if (!req.body.productId || !isPositiveInteger(quantity)) {
+      return res.status(400).json({ message: "A product and positive whole-number quantity are required" });
+    }
+
+    const product = await Product.findById(req.body.productId);
     if (!product) return res.status(404).json({ message: "Product not found" });
-    if (product.stock < quantity) return res.status(400).json({ message: "Not enough stock available" });
 
     const cart = await getOrCreateCart(req.user._id);
+    const productId = String(req.body.productId);
     const existingItem = cart.items.find((item) => item.product.toString() === productId);
+    const requestedTotal = quantity + (existingItem ? existingItem.quantity : 0);
+    if (requestedTotal > product.stock) {
+      return res.status(409).json({ message: "Not enough stock available" });
+    }
 
-    const price = product.discountPrice > 0 ? product.discountPrice : product.price;
-
+    const price =
+      product.discountPrice > 0 && product.discountPrice < product.price
+        ? product.discountPrice
+        : product.price;
     if (existingItem) {
-      existingItem.quantity += Number(quantity);
+      existingItem.quantity = requestedTotal;
       existingItem.price = price;
     } else {
-      cart.items.push({ product: productId, quantity, price });
+      cart.items.push({ product: product._id, quantity, price });
     }
 
     await cart.save();
-    const populated = await cart.populate("items.product", "name images price discountPrice stock");
-    res.status(201).json(populated);
+    res.status(201).json(await cart.populate("items.product", cartProductFields));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route PUT /api/cart/:itemId  { quantity }
-const updateCartItem = async (req, res) => {
+const updateCartItem = async (req, res, next) => {
   try {
-    const { quantity } = req.body;
+    const quantity = Number(req.body.quantity);
+    if (!isPositiveInteger(quantity)) {
+      return res.status(400).json({ message: "Quantity must be a positive whole number" });
+    }
     const cart = await Cart.findOne({ user: req.user._id });
     if (!cart) return res.status(404).json({ message: "Cart not found" });
-
     const item = cart.items.id(req.params.itemId);
     if (!item) return res.status(404).json({ message: "Cart item not found" });
 
-    if (quantity <= 0) {
-      item.deleteOne();
-    } else {
-      item.quantity = quantity;
+    const product = await Product.findById(item.product);
+    if (!product) return res.status(409).json({ message: "This product is no longer available" });
+    if (quantity > product.stock) {
+      return res.status(409).json({ message: "Not enough stock available" });
     }
-
+    item.quantity = quantity;
+    item.price =
+      product.discountPrice > 0 && product.discountPrice < product.price
+        ? product.discountPrice
+        : product.price;
     await cart.save();
-    const populated = await cart.populate("items.product", "name images price discountPrice stock");
-    res.json(populated);
+    res.json(await cart.populate("items.product", cartProductFields));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route DELETE /api/cart/:itemId
-const removeCartItem = async (req, res) => {
+const removeCartItem = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });
     if (!cart) return res.status(404).json({ message: "Cart not found" });
-
+    const before = cart.items.length;
     cart.items = cart.items.filter((item) => item._id.toString() !== req.params.itemId);
+    if (before === cart.items.length) {
+      return res.status(404).json({ message: "Cart item not found" });
+    }
     await cart.save();
-    const populated = await cart.populate("items.product", "name images price discountPrice stock");
-    res.json(populated);
+    res.json(await cart.populate("items.product", cartProductFields));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route DELETE /api/cart
-const clearCart = async (req, res) => {
+const clearCart = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });
     if (cart) {
@@ -97,8 +125,8 @@ const clearCart = async (req, res) => {
     }
     res.json({ message: "Cart cleared" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-module.exports = { getCart, addToCart, updateCartItem, removeCartItem, clearCart };
+module.exports = { addToCart, clearCart, getCart, removeCartItem, updateCartItem };

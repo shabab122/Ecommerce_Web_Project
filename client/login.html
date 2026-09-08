@@ -4,30 +4,41 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="description" content="Sign in to your Norda account." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
 
-  <main class="container">
-    <div class="form-card">
-      <h1>Welcome back</h1>
-      <p>Log in to view your orders and check out faster.</p>
-      <div id="alert-box"></div>
-      <form id="login-form">
-        <div class="field">
-          <label for="email">Email</label>
-          <input type="email" id="email" required />
-        </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input type="password" id="password" required minlength="6" />
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Log in</button>
-      </form>
-      <p class="form-foot">Don't have an account? <a href="register.html">Create one</a></p>
-      <p class="form-foot">Admin demo login: <strong>admin@example.com</strong> / <strong>Admin@12345</strong> (after running the seed script)</p>
+  <main class="auth-page">
+    <div class="container auth-shell">
+      <section class="auth-aside">
+        <span class="eyebrow">Welcome to Norda</span>
+        <h1>Good to have you back.</h1>
+        <p>Pick up your cart, follow every order and keep delivery details ready for next time.</p>
+        <div class="auth-points"><span>Secure session cookie</span><span>Order & payment tracking</span><span>Printable invoices</span></div>
+      </section>
+      <section class="form-card auth-card">
+        <span class="eyebrow">Account access</span>
+        <h2>Sign in</h2>
+        <p>Use the email address attached to your account.</p>
+        <div id="alert-box" aria-live="polite"></div>
+        <form id="login-form">
+          <div class="field">
+            <label for="email">Email address</label>
+            <input type="email" id="email" required maxlength="254" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" required minlength="8" autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        </form>
+        <p class="form-foot">New to Norda? <a class="text-link" href="register.html">Create an account</a></p>
+      </section>
     </div>
   </main>
 

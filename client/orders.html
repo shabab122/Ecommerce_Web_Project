@@ -4,18 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My orders — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="description" content="Track Norda orders, payment status and invoices." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
 
-  <main class="container section">
-    <div class="breadcrumb"><a href="index.html">Home</a> / My orders</div>
-    <h1>My orders</h1>
-    <div id="orders-root">
-      <span class="spinner">Loading orders…</span>
-    </div>
+  <main>
+    <section class="page-intro compact-intro">
+      <div class="container">
+        <div class="breadcrumb"><a href="index.html">Home</a><span>/</span> My orders</div>
+        <span class="eyebrow">Your account</span>
+        <h1>Orders & invoices</h1>
+        <p>Follow fulfillment and payment independently, then open a printable invoice for any order.</p>
+      </div>
+    </section>
+    <section class="container shop-section">
+      <div id="orders-root" aria-live="polite">
+        <span class="spinner">Loading orders…</span>
+      </div>
+    </section>
   </main>
 
   <footer id="site-footer"></footer>
