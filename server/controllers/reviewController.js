@@ -1,76 +1,82 @@
-const Review = require("../models/Review");
+const Order = require("../models/Order");
 const Product = require("../models/Product");
+const Review = require("../models/Review");
+const { cleanText } = require("../utils/validation");
 
 const recalcProductRating = async (productId) => {
-  const reviews = await Review.find({ product: productId });
-  const ratingCount = reviews.length;
-  const ratingAverage = ratingCount
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / ratingCount
-    : 0;
+  const result = await Review.aggregate([
+    { $match: { product: productId } },
+    { $group: { _id: "$product", ratingAverage: { $avg: "$rating" }, ratingCount: { $sum: 1 } } },
+  ]);
+  const summary = result[0] || { ratingAverage: 0, ratingCount: 0 };
   await Product.findByIdAndUpdate(productId, {
-    ratingAverage: Math.round(ratingAverage * 10) / 10,
-    ratingCount,
+    ratingAverage: Math.round(summary.ratingAverage * 10) / 10,
+    ratingCount: summary.ratingCount,
   });
 };
 
-// @route POST /api/reviews { productId, rating, comment }
-const createReview = async (req, res) => {
+const createReview = async (req, res, next) => {
   try {
-    const { productId, rating, comment } = req.body;
-    if (!productId || !rating) {
-      return res.status(400).json({ message: "productId and rating are required" });
+    const rating = Number(req.body.rating);
+    if (!req.body.productId || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "A product and rating from 1 to 5 are required" });
     }
-
-    const product = await Product.findById(productId);
+    const product = await Product.findById(req.body.productId);
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const existing = await Review.findOne({ product: productId, user: req.user._id });
-    if (existing) {
-      existing.rating = rating;
-      existing.comment = comment;
-      await existing.save();
-    } else {
-      await Review.create({ product: productId, user: req.user._id, rating, comment });
+    const purchased = await Order.exists({
+      user: req.user._id,
+      "items.product": product._id,
+      status: "delivered",
+    });
+    if (!purchased) {
+      return res.status(403).json({
+        message: "Reviews are available after this product has been delivered to you",
+      });
     }
 
-    await recalcProductRating(productId);
-    res.status(201).json({ message: "Review saved" });
+    const review = await Review.findOneAndUpdate(
+      { product: product._id, user: req.user._id },
+      {
+        rating,
+        comment: cleanText(req.body.comment, 1200),
+        verifiedPurchase: true,
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
+    await recalcProductRating(product._id);
+    res.status(201).json(review);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/reviews/product/:productId
-const getReviewsByProduct = async (req, res) => {
+const getReviewsByProduct = async (req, res, next) => {
   try {
     const reviews = await Review.find({ product: req.params.productId })
       .populate("user", "name")
       .sort({ createdAt: -1 });
     res.json(reviews);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route DELETE /api/reviews/:id
-const deleteReview = async (req, res) => {
+const deleteReview = async (req, res, next) => {
   try {
     const review = await Review.findById(req.params.id);
     if (!review) return res.status(404).json({ message: "Review not found" });
-
     const isOwner = review.user.toString() === req.user._id.toString();
     if (!isOwner && req.user.role !== "admin") {
       return res.status(403).json({ message: "Not authorized" });
     }
-
     const productId = review.product;
     await review.deleteOne();
     await recalcProductRating(productId);
-
     res.json({ message: "Review deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-module.exports = { createReview, getReviewsByProduct, deleteReview };
+module.exports = { createReview, deleteReview, getReviewsByProduct };

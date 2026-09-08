@@ -1,36 +1,52 @@
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireAdmin()) return;
   renderAdminShell("dashboard");
+  document.getElementById("export-orders-btn").addEventListener("click", exportOrders);
   await loadDashboard();
 });
 
 async function loadDashboard() {
   const root = document.getElementById("dashboard-root");
   try {
-    const s = await Api.get("/admin/dashboard-summary");
+    const summary = await Api.get("/admin/dashboard-summary");
+    const statuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
     root.innerHTML = `
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-value">${s.totalProducts}</div><div class="stat-label">Products</div></div>
-        <div class="stat-card"><div class="stat-value">${s.totalCategories}</div><div class="stat-label">Categories</div></div>
-        <div class="stat-card"><div class="stat-value">${s.totalUsers}</div><div class="stat-label">Customers</div></div>
-        <div class="stat-card"><div class="stat-value">${s.totalOrders}</div><div class="stat-label">Orders</div></div>
-        <div class="stat-card"><div class="stat-value">${money(s.totalRevenue)}</div><div class="stat-label">Revenue (paid orders)</div></div>
-        <div class="stat-card"><div class="stat-value">${s.pendingOrders}</div><div class="stat-label">Pending orders</div></div>
+        ${statCard("Revenue", money(summary.totalRevenue), "Paid, non-cancelled orders", "accent")}
+        ${statCard("Orders", summary.totalOrders, `${summary.pendingOrders} awaiting action`)}
+        ${statCard("Customers", summary.totalUsers, "Registered shoppers")}
+        ${statCard("Products", summary.totalProducts, `${summary.totalCategories} categories · ${summary.totalBrands} brands`)}
+        ${statCard("Invoices", summary.totalInvoices, "One per order")}
+        ${statCard("Failed payments", summary.failedPayments, "Needs review", summary.failedPayments ? "warning" : "")}
       </div>
-
-      <h3>Low stock products (5 or fewer left)</h3>
-      ${
-        s.lowStockProducts.length === 0
-          ? `<p>Nothing running low right now.</p>`
-          : `<table class="data-table">
-              <thead><tr><th>Product</th><th>Stock left</th></tr></thead>
-              <tbody>
-                ${s.lowStockProducts.map((p) => `<tr><td>${escapeHtml(p.name)}</td><td>${p.stock}</td></tr>`).join("")}
-              </tbody>
-            </table>`
-      }
-    `;
-  } catch (e) {
-    root.innerHTML = `<div class="empty-state">Could not load dashboard: ${escapeHtml(e.message)}</div>`;
+      <div class="admin-dashboard-grid">
+        <section class="admin-panel">
+          <div class="panel-heading"><div><span class="eyebrow">Fulfillment</span><h2>Order status</h2></div><a href="orders.html" class="text-link">Manage orders →</a></div>
+          <div class="status-breakdown">${statuses.map((status) => `<div><span class="status-pill status-${status}">${status}</span><strong>${summary.orderStatusCounts?.[status] || 0}</strong></div>`).join("")}</div>
+        </section>
+        <section class="admin-panel">
+          <div class="panel-heading"><div><span class="eyebrow">Inventory</span><h2>Low stock</h2></div><a href="products.html" class="text-link">View products →</a></div>
+          ${summary.lowStockProducts.length ? `<div class="compact-list">${summary.lowStockProducts.map((product) => `<div><span>${escapeHtml(product.name)}</span><strong class="${product.stock === 0 ? "danger-text" : ""}">${product.stock} left</strong></div>`).join("")}</div>` : `<p>Nothing is running low right now.</p>`}
+        </section>
+      </div>
+      <section class="admin-panel admin-section-gap">
+        <div class="panel-heading"><div><span class="eyebrow">Latest activity</span><h2>Recent orders</h2></div><a href="orders.html" class="text-link">View all →</a></div>
+        ${summary.recentOrders.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${summary.recentOrders.map((order) => `<tr><td><strong>#${order._id.slice(-8).toUpperCase()}</strong></td><td>${escapeHtml(order.user?.name || "Deleted user")}</td><td>${formatDate(order.createdAt)}</td><td>${money(order.totalAmount)}</td><td><span class="status-pill payment-${order.paymentStatus}">${escapeHtml(paymentLabel(order.paymentStatus))}</span></td><td><span class="status-pill status-${order.status}">${escapeHtml(order.status)}</span></td></tr>`).join("")}</tbody></table></div>` : `<p>No orders yet.</p>`}
+      </section>`;
+  } catch (error) {
+    root.innerHTML = `<div class="empty-state"><h2>Dashboard unavailable</h2><p>${escapeHtml(error.message)}</p></div>`;
   }
+}
+
+function statCard(label, value, note, tone = "") {
+  return `<article class="stat-card ${tone}"><span class="stat-label">${escapeHtml(label)}</span><strong class="stat-value">${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`;
+}
+
+async function exportOrders() {
+  const button = document.getElementById("export-orders-btn");
+  button.disabled = true;
+  button.textContent = "Preparing CSV…";
+  try { await Api.download("/admin/reports/orders.csv", "norda-orders.csv"); }
+  catch (error) { alert(error.message); }
+  finally { button.disabled = false; button.textContent = "Export orders CSV"; }
 }

@@ -1,37 +1,68 @@
-const Product = require("../models/Product");
-const Order = require("../models/Order");
-const User = require("../models/User");
+const Brand = require("../models/Brand");
 const Category = require("../models/Category");
+const Invoice = require("../models/Invoice");
+const Order = require("../models/Order");
+const Product = require("../models/Product");
+const User = require("../models/User");
 
-// @route GET /api/admin/dashboard-summary (admin)
-const dashboardSummary = async (req, res) => {
+const dashboardSummary = async (req, res, next) => {
   try {
-    const [totalProducts, totalCategories, totalUsers, totalOrders, orders] = await Promise.all([
+    const [
+      totalProducts,
+      totalCategories,
+      totalBrands,
+      totalUsers,
+      totalOrders,
+      totalInvoices,
+      pendingOrders,
+      failedPayments,
+      lowStockProducts,
+      revenueResult,
+      statusResult,
+      recentOrders,
+    ] = await Promise.all([
       Product.countDocuments(),
       Category.countDocuments(),
+      Brand.countDocuments(),
       User.countDocuments({ role: "user" }),
       Order.countDocuments(),
-      Order.find(),
+      Invoice.countDocuments(),
+      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ paymentStatus: "failed" }),
+      Product.find({ stock: { $lte: 5 } }).select("name stock").sort({ stock: 1 }).limit(10),
+      Order.aggregate([
+        { $match: { isPaid: true, status: { $ne: "cancelled" } } },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Order.find()
+        .populate("user", "name")
+        .select("user totalAmount status paymentStatus createdAt")
+        .sort({ createdAt: -1 })
+        .limit(5),
     ]);
 
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.isPaid ? o.totalAmount : 0), 0);
-    const pendingOrders = orders.filter((o) => o.status === "pending").length;
-
-    const lowStockProducts = await Product.find({ stock: { $lte: 5 } })
-      .select("name stock")
-      .limit(10);
+    const orderStatusCounts = statusResult.reduce((result, item) => {
+      result[item._id] = item.count;
+      return result;
+    }, {});
 
     res.json({
       totalProducts,
       totalCategories,
+      totalBrands,
       totalUsers,
       totalOrders,
-      totalRevenue,
+      totalInvoices,
+      totalRevenue: revenueResult[0]?.total || 0,
       pendingOrders,
+      failedPayments,
       lowStockProducts,
+      orderStatusCounts,
+      recentOrders,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 

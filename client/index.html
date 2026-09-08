@@ -3,59 +3,107 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Norda — Everyday shopping, sorted</title>
+  <meta name="description" content="Shop thoughtfully selected electronics, fashion, home essentials, books and fitness gear from Norda." />
+  <title>Norda — Useful things, thoughtfully selected</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
 
-  <section class="hero">
-    <div class="hero-inner container">
-      <div>
-        <h1>Everything you need, nothing you don't.</h1>
-        <p>Norda curates electronics, fashion, home essentials, sports gear and books into one straightforward shop — fair prices, honest descriptions, fast checkout.</p>
-        <div class="hero-ctas">
-          <a href="products.html" class="btn btn-primary">Browse all products</a>
-          <a href="products.html?featured=true" class="btn btn-outline">See featured picks</a>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container">
+        <div class="hero-frame">
+          <img src="assets/norda-hero-v2.png" alt="A curated collection of headphones, clothing, a book, kitchenware and fitness gear" />
+          <div class="hero-copy">
+            <span class="eyebrow">New season · 2026</span>
+            <h1 id="hero-title">Everyday things, chosen with care.</h1>
+            <p>Clear prices, useful products and a checkout that keeps you informed from cart to delivery.</p>
+            <div class="hero-ctas">
+              <a href="products.html" class="btn btn-primary">Shop the collection</a>
+              <a href="products.html?featured=true" class="btn btn-soft">Explore featured picks</a>
+            </div>
+          </div>
+          <div class="hero-notes" aria-label="Store benefits">
+            <span>Delivery across Bangladesh</span>
+            <span>Secure online payment</span>
+            <span>Verified reviews</span>
+          </div>
         </div>
       </div>
-      <div class="hero-stack">
-        <div class="hero-card"><span class="label">Free shipping</span><span class="num">$50+</span></div>
-        <div class="hero-card"><span class="label">Return window</span><span class="num">14 days</span></div>
-        <div class="hero-card"><span class="label">Categories</span><span class="num" id="stat-categories">—</span></div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <main class="container">
-    <section class="section">
-      <div class="section-head">
-        <h2>Shop by category</h2>
+    <section class="trust-row">
+      <div class="container trust-grid">
+        <div><strong id="free-delivery-threshold">৳5,000+</strong><span>Free delivery</span></div>
+        <div><strong>14 days</strong><span>Return window</span></div>
+        <div><strong id="stat-categories">—</strong><span>Curated categories</span></div>
+        <div><strong>SSLCommerz</strong><span>Secure payment</span></div>
       </div>
-      <div id="category-strip" class="category-strip">
+    </section>
+
+    <section class="section container">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Start here</span>
+          <h2>Shop by category</h2>
+        </div>
+        <a href="products.html">Browse everything <span aria-hidden="true">→</span></a>
+      </div>
+      <div id="category-strip" class="category-strip" aria-live="polite">
         <span class="spinner">Loading categories…</span>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h2>Featured picks</h2>
-        <a href="products.html?featured=true">View all &rarr;</a>
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Editor’s selection</span>
+            <h2>Featured picks</h2>
+          </div>
+          <a href="products.html?featured=true">View all <span aria-hidden="true">→</span></a>
+        </div>
+        <div id="featured-grid" class="product-grid" aria-live="polite">
+          <span class="spinner">Loading products…</span>
+        </div>
       </div>
-      <div id="featured-grid" class="product-grid">
+    </section>
+
+    <section class="section container">
+      <div class="split-banner">
+        <div>
+          <span class="eyebrow">The Norda standard</span>
+          <h2>Less guesswork. Better shopping.</h2>
+        </div>
+        <div class="benefit-list">
+          <p><strong>Clear inventory</strong><span>See availability before you order.</span></p>
+          <p><strong>Trackable orders</strong><span>Follow payment and delivery separately.</span></p>
+          <p><strong>Real purchase reviews</strong><span>Reviews unlock after delivery.</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section container">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Recently added</span>
+          <h2>New arrivals</h2>
+        </div>
+        <a href="products.html?sort=newest">View all <span aria-hidden="true">→</span></a>
+      </div>
+      <div id="new-grid" class="product-grid" aria-live="polite">
         <span class="spinner">Loading products…</span>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h2>New arrivals</h2>
-        <a href="products.html?sort=newest">View all &rarr;</a>
-      </div>
-      <div id="new-grid" class="product-grid">
-        <span class="spinner">Loading products…</span>
+    <section class="section brand-section">
+      <div class="container">
+        <span class="eyebrow">Brands at Norda</span>
+        <div id="brand-strip" class="brand-strip" aria-live="polite"></div>
       </div>
     </section>
   </main>

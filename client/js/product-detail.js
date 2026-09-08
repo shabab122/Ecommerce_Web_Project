@@ -1,156 +1,221 @@
+let activeProductId = "";
+
 document.addEventListener("DOMContentLoaded", async () => {
   renderHeader();
   renderFooter();
-
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  const root = document.getElementById("pd-root");
-
-  if (!id) {
-    root.innerHTML = `<div class="empty-state">No product specified.</div>`;
+  activeProductId = new URLSearchParams(window.location.search).get("id") || "";
+  if (!activeProductId) {
+    document.getElementById("pd-root").innerHTML =
+      `<div class="empty-state"><h1>Product not found</h1><a class="btn btn-primary" href="products.html">Return to shop</a></div>`;
     return;
   }
-
-  try {
-    const product = await Api.get(`/products/${id}`);
-    document.title = `${product.name} — Norda`;
-    renderProduct(product);
-    loadReviews(id);
-  } catch (e) {
-    root.innerHTML = `<div class="empty-state">Could not load this product: ${escapeHtml(e.message)}</div>`;
-  }
+  await loadProduct();
 });
 
-function renderProduct(p) {
-  const hasDiscount = p.discountPrice && p.discountPrice > 0 && p.discountPrice < p.price;
-  const shownPrice = hasDiscount ? p.discountPrice : p.price;
-  const img = p.images && p.images.length ? `<img src="${resolveImage(p.images[0])}" alt="${escapeHtml(p.name)}" />` : `<span>${escapeHtml(p.name)}</span>`;
+async function loadProduct() {
+  const root = document.getElementById("pd-root");
+  try {
+    const product = await Api.get("/products/" + encodeURIComponent(activeProductId));
+    document.title = product.name + " — Norda";
+    renderProduct(product);
+    await loadReviews(product._id);
+  } catch (error) {
+    root.innerHTML = `<div class="empty-state"><h1>This product is unavailable</h1><p>${escapeHtml(error.message)}</p><a class="btn btn-primary" href="products.html">Browse products</a></div>`;
+  }
+}
+
+function renderProduct(product) {
+  const discounted =
+    product.discountPrice > 0 && Number(product.discountPrice) < Number(product.price);
+  const price = discounted ? product.discountPrice : product.price;
+  const brand = product.brandRef?.name || product.brand || "Norda selection";
+  const images = (product.images || []).map(resolveImage).filter(Boolean);
+  const mainVisual = images.length
+    ? `<img id="main-product-image" src="${escapeHtml(images[0])}" alt="${escapeHtml(product.name)}" />`
+    : `<div class="pd-fallback"><span>${escapeHtml(product.name)}</span></div>`;
+  const stockText =
+    product.stock === 0
+      ? "Out of stock"
+      : product.stock <= 5
+        ? "Only " + product.stock + " left"
+        : "Ready to dispatch";
 
   document.getElementById("pd-root").innerHTML = `
-    <div class="breadcrumb"><a href="index.html">Home</a> / <a href="products.html">Shop</a> / ${escapeHtml(p.name)}</div>
-    <div class="product-detail">
-      <div class="pd-gallery">${img}</div>
-      <div>
-        <span class="pd-cat">${p.category ? escapeHtml(p.category.name) : ""}</span>
-        <h1 class="pd-title">${escapeHtml(p.name)}</h1>
-        ${p.ratingCount ? `<span class="rating">★ ${p.ratingAverage.toFixed(1)} out of 5 (${p.ratingCount} review${p.ratingCount === 1 ? "" : "s"})</span>` : `<span class="rating">No reviews yet</span>`}
+    <div class="breadcrumb">
+      <a href="index.html">Home</a><span>/</span>
+      <a href="products.html">Shop</a><span>/</span>
+      ${escapeHtml(product.name)}
+    </div>
+    <section class="product-detail">
+      <div class="pd-media">
+        <div class="pd-gallery">${mainVisual}</div>
+        ${
+          images.length > 1
+            ? `<div class="pd-thumbnails">${images
+                .map(
+                  (image, index) =>
+                    `<button type="button" data-image="${escapeHtml(image)}" class="${index === 0 ? "active" : ""}"><img src="${escapeHtml(image)}" alt="" /></button>`
+                )
+                .join("")}</div>`
+            : ""
+        }
+      </div>
+      <div class="pd-content">
+        <span class="eyebrow">${escapeHtml(product.category?.name || "Collection")}</span>
+        <h1 class="pd-title">${escapeHtml(product.name)}</h1>
+        <div class="pd-rating">
+          <span>${product.ratingCount ? "★ " + Number(product.ratingAverage).toFixed(1) : "No ratings yet"}</span>
+          ${product.ratingCount ? `<a href="#reviews">${product.ratingCount} verified review${product.ratingCount === 1 ? "" : "s"}</a>` : ""}
+        </div>
         <div class="pd-price">
-          <span class="price-now">${money(shownPrice)}</span>
-          ${hasDiscount ? `<span class="price-old">${money(p.price)}</span>` : ""}
+          <span class="price-now">${money(price)}</span>
+          ${discounted ? `<span class="price-old">${money(product.price)}</span><span class="sale-copy">Save ${money(product.price - product.discountPrice)}</span>` : ""}
         </div>
-        <p>${escapeHtml(p.description || "No description provided.")}</p>
+        <p class="pd-description">${escapeHtml(product.description || "More information will be added soon.")}</p>
+        <div class="pd-meta-grid">
+          <div><span>Brand</span><strong>${escapeHtml(brand)}</strong></div>
+          <div><span>Availability</span><strong class="${product.stock === 0 ? "danger-text" : ""}">${stockText}</strong></div>
+        </div>
         <div class="pd-actions">
-          <input type="number" id="qty-input" class="qty-input" value="1" min="1" max="${Math.max(p.stock, 1)}" ${p.stock === 0 ? "disabled" : ""} />
-          <button id="add-to-cart-btn" class="btn btn-primary" ${p.stock === 0 ? "disabled" : ""}>${p.stock === 0 ? "Out of stock" : "Add to cart"}</button>
+          <label for="qty-input">Quantity</label>
+          <input type="number" id="qty-input" class="qty-input" value="1" min="1" max="${Math.max(product.stock, 1)}" ${product.stock === 0 ? "disabled" : ""} />
+          <button id="add-to-cart-btn" class="btn btn-primary" ${product.stock === 0 ? "disabled" : ""}>
+            ${product.stock === 0 ? "Unavailable" : "Add to cart"}
+          </button>
         </div>
-        <div id="pd-alert"></div>
-        <div class="pd-meta">
-          <div>Brand: ${escapeHtml(p.brand || "Generic")}</div>
-          <div>${p.stock > 0 ? `${p.stock} in stock` : "Currently unavailable"}</div>
+        <div id="pd-alert" aria-live="polite"></div>
+        <div class="purchase-notes">
+          <p><strong>Secure checkout</strong><span>Pay through SSLCOMMERZ or choose cash on delivery.</span></p>
+          <p><strong>Order invoice</strong><span>A printable invoice is created when you place an order.</span></p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="reviews">Reviews</button>
-      <button class="tab-btn" data-tab="write-review">Write a review</button>
-    </div>
-    <div class="tab-panel active" id="tab-reviews">
-      <div id="review-list"><span class="spinner">Loading reviews…</span></div>
-    </div>
-    <div class="tab-panel" id="tab-write-review">
-      ${
-        Api.isLoggedIn()
-          ? `
-        <form id="review-form">
-          <div class="field">
-            <label for="review-rating">Rating</label>
-            <select id="review-rating">
-              <option value="5">5 - Excellent</option>
-              <option value="4">4 - Good</option>
-              <option value="3">3 - Average</option>
-              <option value="2">2 - Poor</option>
-              <option value="1">1 - Terrible</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="review-comment">Comment</label>
-            <textarea id="review-comment" rows="4" placeholder="Share your thoughts about this product"></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary">Submit review</button>
-        </form>
-        <div id="review-form-alert"></div>
-      `
-          : `<p>Please <a href="login.html">log in</a> to write a review.</p>`
-      }
-    </div>
+    <section class="product-information" id="reviews">
+      <div class="tabs" role="tablist" aria-label="Product information">
+        <button class="tab-btn active" type="button" data-tab="details" role="tab">Details</button>
+        <button class="tab-btn" type="button" data-tab="reviews" role="tab">Reviews</button>
+        <button class="tab-btn" type="button" data-tab="write-review" role="tab">Write a review</button>
+      </div>
+      <div class="tab-panel active" id="tab-details" role="tabpanel">
+        <h2>Product information</h2>
+        <p>${escapeHtml(product.description || "No additional product information is available.")}</p>
+        <dl class="detail-list">
+          <div><dt>Category</dt><dd>${escapeHtml(product.category?.name || "—")}</dd></div>
+          <div><dt>Brand</dt><dd>${escapeHtml(brand)}</dd></div>
+          <div><dt>Stock</dt><dd>${product.stock} unit${product.stock === 1 ? "" : "s"}</dd></div>
+        </dl>
+      </div>
+      <div class="tab-panel" id="tab-reviews" role="tabpanel">
+        <div id="review-list"><span class="spinner">Loading reviews…</span></div>
+      </div>
+      <div class="tab-panel" id="tab-write-review" role="tabpanel">
+        ${
+          Api.isLoggedIn()
+            ? `
+              <div class="review-form-wrap">
+                <h2>Share your experience</h2>
+                <p>You can review this item after a delivered purchase.</p>
+                <form id="review-form">
+                  <div class="field">
+                    <label for="review-rating">Rating</label>
+                    <select id="review-rating">
+                      <option value="5">5 — Excellent</option>
+                      <option value="4">4 — Good</option>
+                      <option value="3">3 — Average</option>
+                      <option value="2">2 — Poor</option>
+                      <option value="1">1 — Very poor</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="review-comment">Comment</label>
+                    <textarea id="review-comment" rows="5" maxlength="1200" placeholder="What should another customer know?"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-primary">Submit review</button>
+                </form>
+                <div id="review-form-alert" aria-live="polite"></div>
+              </div>
+            `
+            : `<p>Please <a class="text-link" href="login.html?next=product-detail.html%3Fid%3D${encodeURIComponent(product._id)}">sign in</a> to review a purchase.</p>`
+        }
+      </div>
+    </section>
   `;
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((tp) => tp.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+  bindProductInteractions(product);
+}
+
+function bindProductInteractions(product) {
+  document.querySelectorAll(".pd-thumbnails button").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.getElementById("main-product-image").src = button.dataset.image;
+      document.querySelectorAll(".pd-thumbnails button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
     });
   });
 
-  const addBtn = document.getElementById("add-to-cart-btn");
-  if (addBtn) {
-    addBtn.addEventListener("click", async () => {
-      if (!requireLogin()) return;
-      const qty = Number(document.getElementById("qty-input").value) || 1;
-      const alertBox = document.getElementById("pd-alert");
-      try {
-        await Api.post("/cart", { productId: p._id, quantity: qty });
-        alertBox.innerHTML = `<div class="alert alert-success">Added to cart.</div>`;
-        refreshCartBadge();
-      } catch (e) {
-        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(e.message)}</div>`;
-      }
+  document.querySelectorAll(".tab-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((item) => item.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      document.getElementById("tab-" + button.dataset.tab).classList.add("active");
     });
-  }
+  });
 
-  const reviewForm = document.getElementById("review-form");
-  if (reviewForm) {
-    reviewForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const rating = Number(document.getElementById("review-rating").value);
-      const comment = document.getElementById("review-comment").value.trim();
-      const alertBox = document.getElementById("review-form-alert");
-      try {
-        await Api.post("/reviews", { productId: p._id, rating, comment });
-        alertBox.innerHTML = `<div class="alert alert-success">Thanks for your review!</div>`;
-        loadReviews(p._id);
-      } catch (e2) {
-        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(e2.message)}</div>`;
-      }
-    });
-  }
+  document.getElementById("add-to-cart-btn")?.addEventListener("click", async () => {
+    if (!requireLogin()) return;
+    const alert = document.getElementById("pd-alert");
+    const quantity = Number(document.getElementById("qty-input").value);
+    try {
+      await Api.post("/cart", { productId: product._id, quantity });
+      alert.innerHTML = `<div class="alert alert-success">Added to cart. <a href="cart.html">View cart</a></div>`;
+      refreshCartBadge();
+    } catch (error) {
+      alert.innerHTML = `<div class="alert alert-error">${escapeHtml(error.message)}</div>`;
+    }
+  });
+
+  document.getElementById("review-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const alert = document.getElementById("review-form-alert");
+    try {
+      await Api.post("/reviews", {
+        productId: product._id,
+        rating: Number(document.getElementById("review-rating").value),
+        comment: document.getElementById("review-comment").value.trim(),
+      });
+      alert.innerHTML = `<div class="alert alert-success">Your review has been saved.</div>`;
+      document.getElementById("review-comment").value = "";
+      await loadReviews(product._id);
+    } catch (error) {
+      alert.innerHTML = `<div class="alert alert-error">${escapeHtml(error.message)}</div>`;
+    }
+  });
 }
 
 async function loadReviews(productId) {
   const list = document.getElementById("review-list");
+  if (!list) return;
   try {
-    const reviews = await Api.get(`/reviews/product/${productId}`);
-    if (reviews.length === 0) {
-      list.innerHTML = `<p>No reviews yet. Be the first to share your thoughts.</p>`;
-      return;
-    }
-    list.innerHTML = reviews
-      .map(
-        (r) => `
-        <div class="review-item">
-          <div class="rev-head">
-            <span>${escapeHtml(r.user ? r.user.name : "Anonymous")}</span>
-            <span class="stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span>
-          </div>
-          <p>${escapeHtml(r.comment || "")}</p>
-        </div>
-      `
-      )
-      .join("");
-  } catch (e) {
-    list.innerHTML = `<p>Could not load reviews.</p>`;
+    const reviews = await Api.get("/reviews/product/" + encodeURIComponent(productId));
+    list.innerHTML = reviews.length
+      ? reviews
+          .map(
+            (review) => `
+              <article class="review-item">
+                <div class="rev-head">
+                  <div><strong>${escapeHtml(review.user?.name || "Customer")}</strong>${review.verifiedPurchase ? `<span class="verified-pill">Verified purchase</span>` : ""}</div>
+                  <span class="stars" aria-label="${review.rating} out of 5 stars">${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)}</span>
+                </div>
+                <p>${escapeHtml(review.comment || "No written comment.")}</p>
+                <time datetime="${review.createdAt}">${formatDate(review.createdAt)}</time>
+              </article>
+            `
+          )
+          .join("")
+      : `<div class="empty-state compact"><h2>No reviews yet</h2><p>Delivered customers can be the first to review this item.</p></div>`;
+  } catch {
+    list.innerHTML = `<p>Reviews could not be loaded.</p>`;
   }
 }

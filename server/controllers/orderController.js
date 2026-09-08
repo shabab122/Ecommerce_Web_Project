@@ -1,125 +1,124 @@
 const Order = require("../models/Order");
-const Cart = require("../models/Cart");
-const Product = require("../models/Product");
+const { syncInvoicePayment } = require("../services/invoiceService");
+const {
+  canTransitionOrder,
+  cancelOrderAndRestoreStock,
+  createOrderFromCart,
+} = require("../services/orderService");
 
-// @route POST /api/orders  { shippingAddress, paymentMethod }
-// Creates an order from the user's current cart, decrements stock, clears the cart.
-const createOrder = async (req, res) => {
+const createOrder = async (req, res, next) => {
   try {
-    const { shippingAddress, paymentMethod = "cod" } = req.body;
-
-    const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ message: "Your cart is empty" });
-    }
-
-    // Validate stock and build order items
-    const orderItems = [];
-    for (const item of cart.items) {
-      if (!item.product) continue;
-      if (item.product.stock < item.quantity) {
-        return res.status(400).json({ message: `Not enough stock for ${item.product.name}` });
-      }
-      orderItems.push({
-        product: item.product._id,
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.price,
+    if (req.body.paymentMethod && req.body.paymentMethod !== "cod") {
+      return res.status(400).json({
+        message: "Use the SSLCOMMERZ payment endpoint for online checkout",
       });
     }
-
-    const totalAmount = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
-
-    const order = await Order.create({
-      user: req.user._id,
-      items: orderItems,
-      shippingAddress,
-      paymentMethod,
-      totalAmount,
+    const result = await createOrderFromCart({
+      user: req.user,
+      shippingAddress: req.body.shippingAddress,
+      paymentMethod: "cod",
     });
-
-    // Decrement stock
-    for (const item of orderItems) {
-      await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.quantity } });
-    }
-
-    // Clear cart
-    cart.items = [];
-    await cart.save();
-
-    res.status(201).json(order);
+    res.status(201).json({
+      ...result.order.toObject(),
+      invoiceNumber: result.invoice.invoiceNumber,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/orders/my
-const getMyOrders = async (req, res) => {
+const getMyOrders = async (req, res, next) => {
   try {
     const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/orders/:id
-const getOrder = async (req, res) => {
+const getOrder = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id).populate("user", "name email");
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    const isOwner = order.user._id.toString() === req.user._id.toString();
+    const ownerId = order.user?._id || order.user;
+    const isOwner = ownerId && ownerId.toString() === req.user._id.toString();
     if (!isOwner && req.user.role !== "admin") {
       return res.status(403).json({ message: "Not authorized to view this order" });
     }
-
     res.json(order);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/orders (admin) - all orders
-const getAllOrders = async (req, res) => {
+const getAllOrders = async (req, res, next) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
-
-    const pageNum = Math.max(Number(page), 1);
-    const limitNum = Math.max(Number(limit), 1);
-
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const [orders, total] = await Promise.all([
       Order.find(filter)
         .populate("user", "name email")
         .sort({ createdAt: -1 })
-        .skip((pageNum - 1) * limitNum)
-        .limit(limitNum),
+        .skip((page - 1) * limit)
+        .limit(limit),
       Order.countDocuments(filter),
     ]);
-
-    res.json({ orders, total, page: pageNum, pages: Math.ceil(total / limitNum) || 1 });
+    res.json({ orders, total, page, pages: Math.ceil(total / limit) || 1 });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route PUT /api/orders/:id/status (admin) { status }
-const updateOrderStatus = async (req, res) => {
+const updateOrderStatus = async (req, res, next) => {
   try {
-    const { status, isPaid } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (status) order.status = status;
-    if (isPaid !== undefined) order.isPaid = isPaid;
+    const requestedStatus = req.body.status || order.status;
+    if (!canTransitionOrder(order.status, requestedStatus)) {
+      return res.status(409).json({
+        message: "Order cannot move from " + order.status + " to " + requestedStatus,
+      });
+    }
 
-    const updated = await order.save();
-    res.json(updated);
+    if (requestedStatus === "cancelled" && order.status !== "cancelled") {
+      return res.json(await cancelOrderAndRestoreStock(order, req.body.cancelReason));
+    }
+
+    if (
+      order.paymentMethod === "sslcommerz" &&
+      !order.isPaid &&
+      ["processing", "shipped", "delivered"].includes(requestedStatus)
+    ) {
+      return res.status(409).json({
+        message: "An online order cannot be fulfilled until payment is validated",
+      });
+    }
+
+    if (req.body.isPaid === false && order.isPaid) {
+      return res.status(409).json({ message: "A paid order cannot be marked unpaid" });
+    }
+    if (req.body.isPaid === true && order.paymentMethod !== "cod") {
+      return res.status(409).json({
+        message: "Online payments can only be marked paid by validated gateway callbacks",
+      });
+    }
+
+    order.status = requestedStatus;
+    if (req.body.isPaid === true || (requestedStatus === "delivered" && order.paymentMethod === "cod")) {
+      order.isPaid = true;
+      order.paymentStatus = "paid";
+      order.paidAt = order.paidAt || new Date();
+    }
+    await order.save();
+    await syncInvoicePayment(order);
+    res.json(order);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-module.exports = { createOrder, getMyOrders, getOrder, getAllOrders, updateOrderStatus };
+module.exports = { createOrder, getAllOrders, getMyOrders, getOrder, updateOrderStatus };

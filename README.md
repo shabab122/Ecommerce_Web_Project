@@ -1,55 +1,36 @@
-# Norda — Full-Stack E-commerce Website
+# Norda v2
 
-A complete e-commerce web application:
+Norda is a full-stack e-commerce application for a Bangladesh-based catalog. Version 2 turns the original foundation into a complete, traceable commerce flow: administrators manage media, categories, brands, products, orders, invoices and reports; customers browse, register, maintain a delivery profile, use a stock-aware cart, check out, track purchases and review delivered products.
 
-- **Frontend:** plain HTML, CSS and JavaScript (no framework, no build step)
-- **Backend:** Node.js + Express.js (REST API)
-- **Database:** MongoDB (via Mongoose)
-- **Auth:** JWT + bcrypt password hashing, with `user` and `admin` roles
+This revision is prepared on `feature/v2-complete-commerce-flow`. The `main` branch is intentionally unchanged until the project is ready for a final release.
 
-```
-ecommerce-app/
-├── server/     Node/Express/MongoDB API
-└── client/     Plain HTML/CSS/JS storefront + admin panel
-```
+## Stack
 
-## Features
+- Client: semantic HTML, responsive CSS and browser JavaScript; no build step
+- API: Node.js 18+, Express and Mongoose
+- Database: MongoDB
+- Authentication: signed JWT in an HTTP-only cookie, with optional bearer-token mode for separated development clients
+- Payments: cash on delivery and SSLCOMMERZ hosted checkout
+- Product media: validated local image uploads with database metadata
 
-**Storefront (client)**
-- Home page with categories, featured products, new arrivals
-- Product listing with search, category filter, price filter, sorting, pagination
-- Product detail page with image, price/discount, stock, reviews and review submission
-- User registration & login (JWT stored in localStorage)
-- Cart (add/update quantity/remove), persisted per user in MongoDB
-- Checkout flow that creates an order, decrements stock and clears the cart
-- Order history page for the logged-in customer
+## Delivered in v2
 
-**Admin panel (client/admin)**
-- Dashboard with key stats (products, categories, customers, orders, revenue, low-stock alert)
-- Product management (create/edit/delete, image upload)
-- Category management (create/edit/delete)
-- Order management (view all orders, update status, mark paid)
+- Redesigned responsive storefront using BDT pricing and an original Norda hero visual
+- Search, category, managed-brand, price and featured-product filters
+- Server-priced cart with live quantity and stock validation
+- Saved customer/shipping profile
+- One invoice per order, with a printable customer view
+- Separate order and payment lifecycles
+- Server-side SSLCOMMERZ session initiation, callback/IPN processing and validation checks
+- Inventory reservation during checkout and idempotent restoration when an unpaid order is cancelled
+- Verified-purchase reviews, limited to delivered purchases
+- Admin overview, category/brand/product management, order workflow, invoice register and protected CSV export
+- Security headers, CORS allowlist, rate limiting, query sanitization, HTTP parameter pollution protection and constrained uploads
+- Unit coverage for totals, address rules, status transitions, CSV safety, payment validation and general validators
 
-**Backend (API)**
-- `/api/auth` — register, login, profile
-- `/api/categories` — CRUD (admin write, public read)
-- `/api/products` — CRUD + search/filter/sort/pagination (admin write, public read)
-- `/api/cart` — per-user cart (auth required)
-- `/api/orders` — checkout, order history, admin order management
-- `/api/reviews` — product reviews (auth required to post)
-- `/api/uploads` — product image upload (admin, multipart/form-data)
-- `/api/admin/dashboard-summary` — admin dashboard stats
+## Quick start
 
-Security middleware included: helmet, mongo-sanitize, hpp, rate limiting, CORS.
-
-## 1. Prerequisites
-
-- Node.js 18+ and npm
-- A running MongoDB instance — either:
-  - Local MongoDB (`mongodb://127.0.0.1:27017`), or
-  - A free MongoDB Atlas cluster (get a connection string from atlas.mongodb.com)
-
-## 2. Backend setup
+Prerequisites: Node.js 18 or newer, npm and MongoDB.
 
 ```bash
 cd server
@@ -57,61 +38,62 @@ npm install
 cp .env.example .env
 ```
 
-Open `.env` and set at minimum:
-
-```
-MONGO_URI=mongodb://127.0.0.1:27017/ecommerce_db
-JWT_SECRET=some_long_random_string
-CLIENT_URL=http://127.0.0.1:5500
-```
-
-(`CLIENT_URL` should match whatever origin your frontend is served from — see step 4.)
-
-Seed the database with an admin account and sample categories/products:
+Edit `.env`. At minimum, set `MONGO_URI`, a unique `JWT_SECRET` of at least 32 characters (for example, generate one with `openssl rand -hex 32`), and an `ADMIN_PASSWORD` of at least 12 characters. Never commit `.env`.
 
 ```bash
 npm run seed
+npm test
+npm run dev
 ```
 
-This prints the admin login it created (default `admin@example.com` / `Admin@12345`, or whatever you set in `.env`).
+Open [http://localhost:5000](http://localhost:5000). Express serves both the storefront and API, so that is the recommended local setup.
 
-Start the API server:
+## Online payment setup
+
+Cash on delivery works without gateway credentials. To enable SSLCOMMERZ sandbox checkout, set:
+
+```dotenv
+SERVER_URL=https://your-public-api.example
+CLIENT_APP_URL=https://your-storefront.example
+SSLCOMMERZ_STORE_ID=your_sandbox_store_id
+SSLCOMMERZ_STORE_PASSWORD=your_sandbox_store_password
+SSLCOMMERZ_IS_LIVE=false
+```
+
+`SERVER_URL` must be publicly reachable by the gateway for callbacks and IPN. Move to live mode only after sandbox acceptance testing, credential rotation and an operational review.
+
+## Project map
+
+```text
+client/                 Storefront and admin workspace
+server/app.js           Express composition and routes
+server/controllers/     HTTP request handlers
+server/services/        Order, invoice and payment rules
+server/models/          MongoDB schemas
+server/test/            Unit tests
+docs/                   Requirements, API and test documentation
+```
+
+## Documentation
+
+- [Project requirements](docs/PROJECT_REQUIREMENTS.md)
+- [API reference](docs/API_REFERENCE.md)
+- [Testing and release guide](docs/TESTING_GUIDE.md)
+- [Architecture and data model](docs/ARCHITECTURE.md)
+- [Visual asset notes](docs/ASSET_NOTES.md)
+- [Changelog](CHANGELOG.md)
+
+## Branch workflow
 
 ```bash
-npm run dev     # with nodemon, auto-restarts on changes
-# or
-npm start       # plain node
+git switch feature/v2-complete-commerce-flow
+git status
+cd server && npm test
+git push -u origin feature/v2-complete-commerce-flow
 ```
 
-The API will be running at `http://localhost:5000/api`, and a health check is available at `http://localhost:5000/api/health`.
+Open a pull request into `main` only after the acceptance checklist in `docs/TESTING_GUIDE.md` passes in the target environment. Do not place secrets, runtime uploads, `node_modules` or local `.env` files in version control.
 
-## 3. Frontend setup
+## Known production follow-ups
 
-The frontend is plain static HTML/CSS/JS, so it doesn't need a build step. You have two options:
-
-**Option A — Let the Express server serve it (simplest)**
-`server.js` already serves the `client/` folder as static files. With the backend running, just open:
-```
-http://localhost:5000/index.html
-```
-No extra setup needed. In this mode you can also set `client/js/config.js` `API_BASE_URL` to an empty string plus keep it as-is (`http://localhost:5000/api` works too since it's the same server).
-
-**Option B — Serve the frontend separately (e.g. VS Code "Live Server", or any static server)**
-```bash
-cd client
-npx serve -l 5500      # or use VS Code's Live Server extension
-```
-Then open `http://127.0.0.1:5500`. Make sure:
-- `client/js/config.js` → `API_BASE_URL = "http://localhost:5000/api"`
-- backend `.env` → `CLIENT_URL=http://127.0.0.1:5500` (so CORS allows it)
-
-## 4. Try it out
-
-1. Visit the storefront, browse products, register a customer account, add items to the cart, and check out.
-2. Log in as the seeded admin (`admin@example.com` / `Admin@12345`) at `/login.html`, then go to `/admin/dashboard.html` to manage products, categories and orders.
-
-## 5. Notes
-
-- Uploaded product images are stored in `server/uploads/` and served at `/uploads/<filename>`.
-- To reset sample data, drop the `ecommerce_db` database and re-run `npm run seed`.
-- This is a learning/demo project: payments are simulated (`cod` or a `card` option with no real charge) — wire up a real payment gateway before using it in production.
+The project is a complete v2 application baseline, not a claim of production certification. Before a public launch, add gateway sandbox/live integration tests, cloud object storage, backup/restore drills, monitoring, transactional email/SMS, a refund workflow, accessibility testing with assistive technology, and a deployment-specific privacy/returns policy.

@@ -4,33 +4,40 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create account — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="description" content="Create a Norda shopping account." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
 
-  <main class="container">
-    <div class="form-card">
-      <h1>Create your account</h1>
-      <p>Join Norda to save your cart and track orders.</p>
-      <div id="alert-box"></div>
-      <form id="register-form">
-        <div class="field">
-          <label for="name">Full name</label>
-          <input type="text" id="name" required />
-        </div>
-        <div class="field">
-          <label for="email">Email</label>
-          <input type="email" id="email" required />
-        </div>
-        <div class="field">
-          <label for="password">Password</label>
-          <input type="password" id="password" required minlength="6" />
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Create account</button>
-      </form>
-      <p class="form-foot">Already have an account? <a href="login.html">Log in</a></p>
+  <main class="auth-page">
+    <div class="container auth-shell">
+      <section class="auth-aside auth-aside-orange">
+        <span class="eyebrow">Join Norda</span>
+        <h1>A calmer way to shop.</h1>
+        <p>Create one account for your cart, delivery profile, order history, invoices and verified reviews.</p>
+        <div class="auth-points"><span>One saved delivery profile</span><span>Live stock-aware cart</span><span>Reviews after delivery</span></div>
+      </section>
+      <section class="form-card auth-card">
+        <span class="eyebrow">New account</span>
+        <h2>Create your account</h2>
+        <p>It only takes a moment.</p>
+        <div id="alert-box" aria-live="polite"></div>
+        <form id="register-form">
+          <div class="field"><label for="name">Full name</label><input type="text" id="name" required maxlength="80" autocomplete="name" /></div>
+          <div class="field"><label for="email">Email address</label><input type="email" id="email" required maxlength="254" autocomplete="email" /></div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" required minlength="8" autocomplete="new-password" aria-describedby="password-help" />
+            <small id="password-help" class="field-help">Use at least 8 characters.</small>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Create account</button>
+        </form>
+        <p class="form-foot">Already have an account? <a class="text-link" href="login.html">Sign in</a></p>
+      </section>
     </div>
   </main>
 

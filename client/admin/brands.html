@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Brands — Norda Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/admin.css" />
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar" id="admin-sidebar"></aside>
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <div><span class="eyebrow">Catalog</span><h1>Brands</h1><p>Use managed brands to keep filtering and product data consistent.</p></div>
+        <div class="admin-topbar-actions"><span id="admin-topbar-user"></span><button class="btn btn-primary btn-sm" id="new-brand-btn">+ New brand</button></div>
+      </div>
+      <div id="alert-box" aria-live="polite"></div>
+      <div class="admin-panel" id="brands-root"><span class="spinner">Loading brands…</span></div>
+    </main>
+  </div>
+
+  <div class="modal-overlay hidden" id="brand-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <h2 id="modal-title">New brand</h2>
+      <form id="brand-form">
+        <input type="hidden" id="brand-id" />
+        <div class="field"><label for="brand-name">Name</label><input type="text" id="brand-name" required maxlength="80" /></div>
+        <div class="field"><label for="brand-description">Description</label><textarea id="brand-description" rows="4" maxlength="500"></textarea></div>
+        <div class="field"><label for="brand-logo">Logo URL <span>Optional</span></label><input type="url" id="brand-logo" maxlength="500" placeholder="https://…" /></div>
+        <label class="check-field"><input type="checkbox" id="brand-active" checked /> Visible in the storefront</label>
+        <div class="modal-actions"><button type="button" class="btn btn-outline btn-sm" id="cancel-brand-btn">Cancel</button><button type="submit" class="btn btn-primary btn-sm" id="save-brand-btn">Save brand</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/layout.js"></script>
+  <script src="admin-layout.js"></script><script src="brands.js"></script>
+</body>
+</html>

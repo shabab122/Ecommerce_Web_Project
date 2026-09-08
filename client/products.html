@@ -3,50 +3,86 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Browse and filter the complete Norda product catalog." />
   <title>Shop all products — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
 
-  <main class="container section">
-    <div class="breadcrumb"><a href="index.html">Home</a> / Shop</div>
-    <div class="products-layout">
-      <aside class="filters">
-        <h3>Categories</h3>
-        <ul class="filters-list" id="filter-categories">
-          <li><a href="products.html" data-cat="">All categories</a></li>
-        </ul>
-
-        <h3>Price range</h3>
-        <form id="price-form">
-          <div class="field">
-            <label for="min-price">Min price</label>
-            <input type="number" id="min-price" min="0" placeholder="0" />
-          </div>
-          <div class="field">
-            <label for="max-price">Max price</label>
-            <input type="number" id="max-price" min="0" placeholder="500" />
-          </div>
-          <button type="submit" class="btn btn-outline btn-sm btn-block">Apply</button>
-        </form>
-      </aside>
-
-      <div>
-        <div class="toolbar">
-          <span id="result-count">Loading products…</span>
-          <select id="sort-select">
-            <option value="newest">Newest</option>
-            <option value="price_asc">Price: Low to High</option>
-            <option value="price_desc">Price: High to Low</option>
-            <option value="top_rated">Top rated</option>
-          </select>
-        </div>
-        <div id="product-grid" class="product-grid"></div>
-        <div id="pagination" class="pagination"></div>
+  <main>
+    <section class="page-intro">
+      <div class="container">
+        <div class="breadcrumb"><a href="index.html">Home</a><span>/</span> Shop</div>
+        <span class="eyebrow">The full collection</span>
+        <h1 id="shop-title">Shop useful things</h1>
+        <p>Filter by category, brand or price. Inventory and prices come directly from the store.</p>
       </div>
-    </div>
+    </section>
+
+    <section class="container shop-section">
+      <div class="products-layout">
+        <aside class="filters" aria-label="Product filters">
+          <div class="filter-heading">
+            <h2>Filters</h2>
+            <button type="button" class="text-button" id="clear-filters">Clear all</button>
+          </div>
+
+          <div class="filter-group">
+            <h3>Categories</h3>
+            <ul class="filters-list" id="filter-categories">
+              <li><span class="spinner-inline">Loading…</span></li>
+            </ul>
+          </div>
+
+          <div class="filter-group">
+            <h3>Brands</h3>
+            <ul class="filters-list" id="filter-brands">
+              <li><span class="spinner-inline">Loading…</span></li>
+            </ul>
+          </div>
+
+          <div class="filter-group">
+            <h3>Price in BDT</h3>
+            <form id="price-form">
+              <div class="price-fields">
+                <div class="field">
+                  <label for="min-price">Minimum</label>
+                  <input type="number" id="min-price" min="0" step="1" placeholder="0" />
+                </div>
+                <div class="field">
+                  <label for="max-price">Maximum</label>
+                  <input type="number" id="max-price" min="0" step="1" placeholder="20,000" />
+                </div>
+              </div>
+              <div id="price-error" class="field-error" role="alert"></div>
+              <button type="submit" class="btn btn-outline btn-sm btn-block">Apply price</button>
+            </form>
+          </div>
+        </aside>
+
+        <div class="catalog">
+          <div class="toolbar">
+            <span id="result-count" aria-live="polite">Loading products…</span>
+            <label class="sort-control">
+              <span>Sort</span>
+              <select id="sort-select">
+                <option value="newest">Newest first</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="top_rated">Top rated</option>
+              </select>
+            </label>
+          </div>
+          <div id="active-filters" class="active-filters"></div>
+          <div id="product-grid" class="product-grid" aria-live="polite"></div>
+          <nav id="pagination" class="pagination" aria-label="Product pages"></nav>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer id="site-footer"></footer>

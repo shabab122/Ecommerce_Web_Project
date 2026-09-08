@@ -3,21 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Complete delivery details and securely pay for your Norda order." />
   <title>Checkout — Norda</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header id="site-header"></header>
-
-  <main class="container section">
-    <div class="breadcrumb"><a href="index.html">Home</a> / <a href="cart.html">Cart</a> / Checkout</div>
-    <h1>Checkout</h1>
-    <div id="checkout-root">
-      <span class="spinner">Loading order details…</span>
-    </div>
+  <main>
+    <section class="page-intro compact-intro">
+      <div class="container">
+        <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><a href="cart.html">Cart</a><span>/</span> Checkout</div>
+        <span class="eyebrow">Secure checkout</span>
+        <h1>Delivery & payment</h1>
+        <div class="checkout-steps" aria-label="Checkout progress">
+          <span class="complete">1 · Cart</span><span class="active">2 · Details</span><span>3 · Confirmation</span>
+        </div>
+      </div>
+    </section>
+    <section class="container shop-section" id="checkout-root" aria-live="polite">
+      <span class="spinner">Preparing checkout…</span>
+    </section>
   </main>
-
   <footer id="site-footer"></footer>
 
   <script src="js/config.js"></script>

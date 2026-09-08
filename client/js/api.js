@@ -1,32 +1,39 @@
-/**
- * Thin wrapper around fetch() that attaches the JWT (if present) and
- * normalizes error handling for the whole frontend.
- */
 const Api = {
   getToken() {
     return localStorage.getItem("norda_token");
   },
 
   setSession(user) {
-    localStorage.setItem("norda_token", user.token);
+    if (user.token) localStorage.setItem("norda_token", user.token);
+    else localStorage.removeItem("norda_token");
     localStorage.setItem(
       "norda_user",
-      JSON.stringify({ _id: user._id, name: user.name, email: user.email, role: user.role })
+      JSON.stringify({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        address: user.address || null,
+      })
     );
   },
 
   getUser() {
-    const raw = localStorage.getItem("norda_user");
-    return raw ? JSON.parse(raw) : null;
+    try {
+      const value = localStorage.getItem("norda_user");
+      return value ? JSON.parse(value) : null;
+    } catch {
+      this.logout();
+      return null;
+    }
   },
 
   isLoggedIn() {
-    return !!this.getToken();
+    return Boolean(this.getUser());
   },
 
   isAdmin() {
-    const user = this.getUser();
-    return !!user && user.role === "admin";
+    return this.getUser()?.role === "admin";
   },
 
   logout() {
@@ -35,27 +42,34 @@ const Api = {
   },
 
   async request(path, { method = "GET", body, isForm = false } = {}) {
-    const headers = {};
+    const headers = { Accept: "application/json" };
     const token = this.getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    if (!isForm) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = "Bearer " + token;
+    if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
 
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      headers,
-      body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
-    });
-
-    let data = null;
+    let response;
     try {
-      data = await res.json();
-    } catch (e) {
-      data = null;
+      response = await fetch(API_BASE_URL + path, {
+        method,
+        headers,
+        credentials: "include",
+        body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+      });
+    } catch {
+      throw new Error("Cannot reach the Norda server. Check that the API is running.");
     }
 
-    if (!res.ok) {
-      const message = (data && data.message) || `Request failed with status ${res.status}`;
-      throw new Error(message);
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => "");
+
+    if (!response.ok) {
+      const error = new Error(data?.message || "Request failed with status " + response.status);
+      if (data?.orderId) error.orderId = data.orderId;
+      if (data?.invoiceNumber) error.invoiceNumber = data.invoiceNumber;
+      if (response.status === 401 && !path.includes("/auth/login")) this.logout();
+      throw error;
     }
     return data;
   },
@@ -63,13 +77,40 @@ const Api = {
   get(path) {
     return this.request(path);
   },
-  post(path, body, opts = {}) {
-    return this.request(path, { method: "POST", body, ...opts });
+
+  post(path, body, options = {}) {
+    return this.request(path, { method: "POST", body, ...options });
   },
-  put(path, body, opts = {}) {
-    return this.request(path, { method: "PUT", body, ...opts });
+
+  put(path, body, options = {}) {
+    return this.request(path, { method: "PUT", body, ...options });
   },
+
   del(path) {
     return this.request(path, { method: "DELETE" });
+  },
+
+  async download(path, fallbackName) {
+    const headers = {};
+    const token = this.getToken();
+    if (token) headers.Authorization = "Bearer " + token;
+    const response = await fetch(API_BASE_URL + path, {
+      headers,
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || "Download failed");
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const filenameMatch = disposition.match(/filename="([^"]+)"/);
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = filenameMatch?.[1] || fallbackName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
   },
 };

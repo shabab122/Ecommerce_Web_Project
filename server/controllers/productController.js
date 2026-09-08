@@ -1,130 +1,186 @@
+const Brand = require("../models/Brand");
+const Category = require("../models/Category");
 const Product = require("../models/Product");
 const { slugify } = require("./categoryController");
+const { cleanAssetUrl, cleanText, escapeRegExp } = require("../utils/validation");
 
-// @route POST /api/products (admin)
-const createProduct = async (req, res) => {
+const parseProductPayload = async (body, currentProduct = null) => {
+  const name = body.name !== undefined ? cleanText(body.name, 140) : currentProduct?.name;
+  const description =
+    body.description !== undefined ? cleanText(body.description, 3000) : currentProduct?.description;
+  const price = body.price !== undefined ? Number(body.price) : currentProduct?.price;
+  const discountPrice =
+    body.discountPrice !== undefined ? Number(body.discountPrice || 0) : currentProduct?.discountPrice;
+  const stock = body.stock !== undefined ? Number(body.stock) : currentProduct?.stock;
+  const categoryId = body.category !== undefined ? body.category : currentProduct?.category;
+  const brandId = body.brandRef !== undefined ? body.brandRef : currentProduct?.brandRef;
+
+  if (!name || !categoryId || !Number.isFinite(price) || price <= 0) {
+    const error = new Error("Name, category and a price greater than zero are required");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isInteger(stock) || stock < 0) {
+    const error = new Error("Stock must be a whole number of zero or more");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Number.isFinite(discountPrice) || discountPrice < 0 || discountPrice >= price) {
+    if (discountPrice !== 0) {
+      const error = new Error("Discount price must be zero or lower than the regular price");
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  const category = await Category.findById(categoryId);
+  if (!category) {
+    const error = new Error("Selected category does not exist");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let brand = null;
+  if (brandId) {
+    brand = await Brand.findById(brandId);
+    if (!brand) {
+      const error = new Error("Selected brand does not exist");
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  return {
+    name,
+    description,
+    price,
+    discountPrice,
+    stock,
+    category: category._id,
+    brandRef: brand?._id || null,
+    brand: brand?.name || cleanText(body.brand, 80) || currentProduct?.brand || "Generic",
+    images: Array.isArray(body.images)
+      ? body.images.map(cleanAssetUrl).filter(Boolean).slice(0, 6)
+      : currentProduct?.images || [],
+    isFeatured: body.isFeatured !== undefined ? Boolean(body.isFeatured) : currentProduct?.isFeatured,
+  };
+};
+
+const uniqueSlug = async (name, excludedId = null) => {
+  const base = slugify(name) || "product";
+  let candidate = base;
+  let suffix = 1;
+  const filter = () => ({
+    slug: candidate,
+    ...(excludedId ? { _id: { $ne: excludedId } } : {}),
+  });
+  while (await Product.exists(filter())) {
+    candidate = base + "-" + suffix;
+    suffix += 1;
+  }
+  return candidate;
+};
+
+const createProduct = async (req, res, next) => {
   try {
-    const { name, description, price, discountPrice, stock, category, brand, images, isFeatured } = req.body;
-
-    if (!name || !price || !category) {
-      return res.status(400).json({ message: "Name, price and category are required" });
-    }
-
-    let slug = slugify(name);
-    let candidate = slug;
-    let i = 1;
-    while (await Product.findOne({ slug: candidate })) {
-      candidate = `${slug}-${i++}`;
-    }
-
-    const product = await Product.create({
-      name,
-      slug: candidate,
-      description,
-      price,
-      discountPrice: discountPrice || 0,
-      stock: stock || 0,
-      category,
-      brand,
-      images: images || [],
-      isFeatured: !!isFeatured,
-    });
-
+    const payload = await parseProductPayload(req.body);
+    payload.slug = await uniqueSlug(payload.name);
+    const product = await Product.create(payload);
     res.status(201).json(product);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/products
-// supports: ?category=<id>&keyword=<text>&minPrice=&maxPrice=&featured=true&sort=price_asc|price_desc|newest&page=1&limit=12
-const getProducts = async (req, res) => {
+const getProducts = async (req, res, next) => {
   try {
-    const { category, keyword, minPrice, maxPrice, featured, sort, page = 1, limit = 12 } = req.query;
-
+    const { category, brand, keyword, minPrice, maxPrice, featured, sort } = req.query;
     const filter = {};
     if (category) filter.category = category;
-    if (featured) filter.isFeatured = featured === "true";
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
-    }
+    if (brand) filter.brandRef = brand;
+    if (featured !== undefined && featured !== "") filter.isFeatured = featured === "true";
     if (keyword) {
+      const safeKeyword = escapeRegExp(cleanText(keyword, 80));
       filter.$or = [
-        { name: { $regex: keyword, $options: "i" } },
-        { description: { $regex: keyword, $options: "i" } },
+        { name: { $regex: safeKeyword, $options: "i" } },
+        { description: { $regex: safeKeyword, $options: "i" } },
+        { brand: { $regex: safeKeyword, $options: "i" } },
       ];
     }
 
+    if (minPrice || maxPrice) {
+      const effectivePrice = {
+        $cond: [
+          { $and: [{ $gt: ["$discountPrice", 0] }, { $lt: ["$discountPrice", "$price"] }] },
+          "$discountPrice",
+          "$price",
+        ],
+      };
+      const conditions = [];
+      if (minPrice && Number.isFinite(Number(minPrice))) {
+        conditions.push({ $gte: [effectivePrice, Number(minPrice)] });
+      }
+      if (maxPrice && Number.isFinite(Number(maxPrice))) {
+        conditions.push({ $lte: [effectivePrice, Number(maxPrice)] });
+      }
+      if (conditions.length) filter.$expr = { $and: conditions };
+    }
+
     let sortOption = { createdAt: -1 };
-    if (sort === "price_asc") sortOption = { price: 1 };
-    if (sort === "price_desc") sortOption = { price: -1 };
-    if (sort === "newest") sortOption = { createdAt: -1 };
-    if (sort === "top_rated") sortOption = { ratingAverage: -1 };
+    if (sort === "price_asc") sortOption = { price: 1, createdAt: -1 };
+    if (sort === "price_desc") sortOption = { price: -1, createdAt: -1 };
+    if (sort === "top_rated") sortOption = { ratingAverage: -1, ratingCount: -1 };
 
-    const pageNum = Math.max(Number(page), 1);
-    const limitNum = Math.max(Number(limit), 1);
-
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 100);
     const [products, total] = await Promise.all([
       Product.find(filter)
         .populate("category", "name slug")
+        .populate("brandRef", "name slug logo")
         .sort(sortOption)
-        .skip((pageNum - 1) * limitNum)
-        .limit(limitNum),
+        .skip((page - 1) * limit)
+        .limit(limit),
       Product.countDocuments(filter),
     ]);
-
-    res.json({
-      products,
-      total,
-      page: pageNum,
-      pages: Math.ceil(total / limitNum) || 1,
-    });
+    res.json({ products, total, page, pages: Math.ceil(total / limit) || 1 });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route GET /api/products/:id
-const getProduct = async (req, res) => {
+const getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id).populate("category", "name slug");
+    const product = await Product.findById(req.params.id)
+      .populate("category", "name slug")
+      .populate("brandRef", "name slug logo");
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route PUT /api/products/:id (admin)
-const updateProduct = async (req, res) => {
+const updateProduct = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
-
-    const fields = ["name", "description", "price", "discountPrice", "stock", "category", "brand", "images", "isFeatured"];
-    fields.forEach((f) => {
-      if (req.body[f] !== undefined) product[f] = req.body[f];
-    });
-    if (req.body.name) product.slug = slugify(req.body.name);
-
-    const updated = await product.save();
-    res.json(updated);
+    const payload = await parseProductPayload(req.body, product);
+    Object.assign(product, payload);
+    if (req.body.name !== undefined) product.slug = await uniqueSlug(payload.name, product._id);
+    res.json(await product.save());
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-// @route DELETE /api/products/:id (admin)
-const deleteProduct = async (req, res) => {
+const deleteProduct = async (req, res, next) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json({ message: "Product deleted" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-module.exports = { createProduct, getProducts, getProduct, updateProduct, deleteProduct };
+module.exports = { createProduct, deleteProduct, getProduct, getProducts, updateProduct };

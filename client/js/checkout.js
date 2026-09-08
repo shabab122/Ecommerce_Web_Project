@@ -8,90 +8,168 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadCheckout() {
   const root = document.getElementById("checkout-root");
   try {
-    const cart = await Api.get("/cart");
-    const items = (cart.items || []).filter((i) => i.product);
-
-    if (items.length === 0) {
-      root.innerHTML = `<div class="empty-state">Your cart is empty. <a href="products.html">Go shopping</a>.</div>`;
+    const [cart, profile, paymentConfig, store] = await Promise.all([
+      Api.get("/cart"),
+      Api.get("/auth/profile"),
+      Api.get("/payments/config"),
+      Api.get("/store/config"),
+    ]);
+    const items = (cart.items || []).filter((item) => item.product);
+    if (!items.length) {
+      root.innerHTML = `<div class="empty-state spacious"><h2>Your cart is empty</h2><p>Add at least one product before checkout.</p><a class="btn btn-primary" href="products.html">Browse products</a></div>`;
       return;
     }
 
-    const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const shipping = subtotal >= 50 ? 0 : 6.99;
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const shipping = subtotal >= store.freeShippingThreshold ? 0 : store.flatShippingFee;
     const total = subtotal + shipping;
+    const address = profile.address || {};
 
     root.innerHTML = `
-      <div class="cart-layout">
-        <div>
-          <h3>Shipping details</h3>
-          <div id="checkout-alert"></div>
-          <form id="checkout-form">
-            <div class="field">
-              <label for="address-line">Street address</label>
-              <input type="text" id="address-line" required placeholder="123 Market Street" />
+      <div class="checkout-layout">
+        <form id="checkout-form" class="checkout-form">
+          <section class="checkout-card">
+            <div class="checkout-card-head"><span>01</span><div><h2>Delivery details</h2><p>We will save these details to your profile for your next order.</p></div></div>
+            <div id="checkout-alert" aria-live="polite"></div>
+            <div class="form-grid two">
+              <div class="field field-wide">
+                <label for="address-line">Street address</label>
+                <input type="text" id="address-line" required maxlength="120" autocomplete="street-address" value="${escapeHtml(address.line1 || "")}" placeholder="House, road and area" />
+              </div>
+              <div class="field field-wide">
+                <label for="address-line-2">Apartment or landmark <span>Optional</span></label>
+                <input type="text" id="address-line-2" maxlength="120" value="${escapeHtml(address.line2 || "")}" placeholder="Apartment, floor or nearby landmark" />
+              </div>
+              <div class="field">
+                <label for="city">City</label>
+                <input type="text" id="city" required maxlength="60" autocomplete="address-level2" value="${escapeHtml(address.city || "Dhaka")}" />
+              </div>
+              <div class="field">
+                <label for="district">District</label>
+                <input type="text" id="district" required maxlength="60" autocomplete="address-level1" value="${escapeHtml(address.district || "Dhaka")}" />
+              </div>
+              <div class="field">
+                <label for="postcode">Postal code</label>
+                <input type="text" id="postcode" required maxlength="20" autocomplete="postal-code" value="${escapeHtml(address.postCode || "")}" placeholder="1207" />
+              </div>
+              <div class="field">
+                <label for="phone">Phone number</label>
+                <input type="tel" id="phone" required maxlength="20" autocomplete="tel" value="${escapeHtml(address.phone || "")}" placeholder="+880 1XXXXXXXXX" />
+              </div>
+              <div class="field field-wide">
+                <label for="country">Country</label>
+                <input type="text" id="country" required maxlength="60" autocomplete="country-name" value="${escapeHtml(address.country || "Bangladesh")}" />
+              </div>
             </div>
-            <div class="field">
-              <label for="city">City</label>
-              <input type="text" id="city" required placeholder="Dhaka" />
+          </section>
+
+          <section class="checkout-card">
+            <div class="checkout-card-head"><span>02</span><div><h2>Payment method</h2><p>Your invoice is created before payment begins.</p></div></div>
+            <div class="payment-options">
+              <label class="payment-option ${paymentConfig.sslcommerzEnabled ? "selected" : "disabled"}">
+                <input type="radio" name="payment-method" value="sslcommerz" ${paymentConfig.sslcommerzEnabled ? "checked" : "disabled"} />
+                <span class="payment-copy"><strong>Pay online with SSLCOMMERZ</strong><small>Cards, mobile banking and internet banking · ${escapeHtml(paymentConfig.environment)} environment</small></span>
+                <span class="secure-chip">Secure</span>
+              </label>
+              ${!paymentConfig.sslcommerzEnabled ? `<p class="gateway-note">Online payment is disabled until sandbox credentials are added to the server environment.</p>` : ""}
+              <label class="payment-option ${paymentConfig.sslcommerzEnabled ? "" : "selected"}">
+                <input type="radio" name="payment-method" value="cod" ${paymentConfig.sslcommerzEnabled ? "" : "checked"} />
+                <span class="payment-copy"><strong>Cash on delivery</strong><small>Pay when the order reaches you</small></span>
+              </label>
             </div>
-            <div class="field">
-              <label for="postcode">Postal code</label>
-              <input type="text" id="postcode" required placeholder="1207" />
-            </div>
-            <div class="field">
-              <label for="phone">Phone number</label>
-              <input type="tel" id="phone" required placeholder="+880 1XXXXXXXXX" />
-            </div>
-            <div class="field">
-              <label for="payment-method">Payment method</label>
-              <select id="payment-method">
-                <option value="cod">Cash on delivery</option>
-                <option value="card">Card (demo — no real charge)</option>
-              </select>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block" id="place-order-btn">Place order</button>
-          </form>
-        </div>
-        <div class="summary-card">
-          <h3>Order summary</h3>
-          ${items
-            .map(
-              (i) => `<div class="summary-row"><span>${escapeHtml(i.product.name)} × ${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`
-            )
-            .join("")}
-          <div class="summary-row"><span>Shipping</span><span>${shipping === 0 ? "Free" : money(shipping)}</span></div>
+          </section>
+        </form>
+
+        <aside class="summary-card checkout-summary">
+          <span class="eyebrow">Your order</span>
+          <h2>${items.length} product${items.length === 1 ? "" : "s"}</h2>
+          <div class="checkout-items">
+            ${items
+              .map(
+                (item) => `<div><span>${escapeHtml(item.product.name)} <small>× ${item.quantity}</small></span><strong>${money(item.price * item.quantity)}</strong></div>`
+              )
+              .join("")}
+          </div>
+          <div class="summary-row"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+          <div class="summary-row"><span>Delivery</span><span>${shipping ? money(shipping) : "Free"}</span></div>
           <div class="summary-row summary-total"><span>Total</span><span>${money(total)}</span></div>
-        </div>
+          <button type="submit" form="checkout-form" class="btn btn-primary btn-block" id="place-order-btn">Continue securely</button>
+          <p class="summary-note">By continuing, you confirm that the delivery details are correct.</p>
+        </aside>
       </div>
     `;
 
-    document.getElementById("checkout-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById("place-order-btn");
-      btn.disabled = true;
-      btn.textContent = "Placing order…";
-      const alertBox = document.getElementById("checkout-alert");
-
-      const payload = {
-        shippingAddress: {
-          line1: document.getElementById("address-line").value.trim(),
-          city: document.getElementById("city").value.trim(),
-          postCode: document.getElementById("postcode").value.trim(),
-          phone: document.getElementById("phone").value.trim(),
-        },
-        paymentMethod: document.getElementById("payment-method").value,
-      };
-
-      try {
-        const order = await Api.post("/orders", payload);
-        window.location.href = `orders.html?placed=${order._id}`;
-      } catch (err) {
-        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
-        btn.disabled = false;
-        btn.textContent = "Place order";
-      }
-    });
-  } catch (e) {
-    root.innerHTML = `<div class="empty-state">Could not load checkout: ${escapeHtml(e.message)}</div>`;
+    bindCheckoutForm();
+  } catch (error) {
+    root.innerHTML = `<div class="empty-state"><h2>Checkout unavailable</h2><p>${escapeHtml(error.message)}</p><a class="btn btn-primary" href="cart.html">Return to cart</a></div>`;
   }
+}
+
+function shippingPayload() {
+  return {
+    line1: document.getElementById("address-line").value.trim(),
+    line2: document.getElementById("address-line-2").value.trim(),
+    city: document.getElementById("city").value.trim(),
+    district: document.getElementById("district").value.trim(),
+    postCode: document.getElementById("postcode").value.trim(),
+    country: document.getElementById("country").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+  };
+}
+
+function bindCheckoutForm() {
+  const selectedMethod = document.querySelector('input[name="payment-method"]:checked');
+  if (selectedMethod) {
+    document.getElementById("place-order-btn").textContent =
+      selectedMethod.value === "sslcommerz"
+        ? "Continue to secure payment"
+        : "Place cash-on-delivery order";
+  }
+
+  document.querySelectorAll('input[name="payment-method"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      document.querySelectorAll(".payment-option").forEach((option) => option.classList.remove("selected"));
+      input.closest(".payment-option").classList.add("selected");
+      document.getElementById("place-order-btn").textContent =
+        input.value === "sslcommerz" ? "Continue to secure payment" : "Place cash-on-delivery order";
+    });
+  });
+
+  document.getElementById("checkout-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("place-order-btn");
+    const alert = document.getElementById("checkout-alert");
+    const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+    button.disabled = true;
+    button.textContent = paymentMethod === "sslcommerz" ? "Opening secure payment…" : "Creating order…";
+    alert.innerHTML = "";
+
+    try {
+      if (paymentMethod === "sslcommerz") {
+        const result = await Api.post("/payments/sslcommerz/initiate", {
+          shippingAddress: shippingPayload(),
+        });
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
+      const order = await Api.post("/orders", {
+        shippingAddress: shippingPayload(),
+        paymentMethod: "cod",
+      });
+      const query = new URLSearchParams({
+        placed: order._id,
+        invoice: order.invoiceNumber || "",
+      });
+      window.location.href = "orders.html?" + query.toString();
+    } catch (error) {
+      if (error.orderId) {
+        alert.innerHTML = `<div class="alert alert-error"><strong>Your order was saved, but payment could not start.</strong><br />You can see the unpaid order in <a href="orders.html">My Orders</a>. No payment was collected.</div>`;
+      } else {
+        alert.innerHTML = `<div class="alert alert-error">${escapeHtml(error.message)}</div>`;
+      }
+      button.disabled = false;
+      button.textContent = paymentMethod === "sslcommerz" ? "Continue to secure payment" : "Place cash-on-delivery order";
+      alert.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
 }

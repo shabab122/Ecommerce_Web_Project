@@ -1,5 +1,6 @@
 const state = {
   category: "",
+  brand: "",
   keyword: "",
   featured: "",
   minPrice: "",
@@ -9,108 +10,185 @@ const state = {
   limit: 12,
 };
 
+const names = { categories: new Map(), brands: new Map() };
+
 document.addEventListener("DOMContentLoaded", async () => {
   renderHeader("products");
   renderFooter();
 
   const params = new URLSearchParams(window.location.search);
-  state.category = params.get("category") || "";
-  state.keyword = params.get("keyword") || "";
-  state.featured = params.get("featured") || "";
-  state.sort = params.get("sort") || "newest";
+  for (const key of ["category", "brand", "keyword", "featured", "minPrice", "maxPrice", "sort"]) {
+    if (params.get(key)) state[key] = params.get(key);
+  }
+  state.page = Math.max(Number(params.get("page")) || 1, 1);
+  if (!["newest", "price_asc", "price_desc", "top_rated"].includes(state.sort)) {
+    state.sort = "newest";
+  }
 
   document.getElementById("sort-select").value = state.sort;
-  document.getElementById("sort-select").addEventListener("change", (e) => {
-    state.sort = e.target.value;
+  document.getElementById("min-price").value = state.minPrice;
+  document.getElementById("max-price").value = state.maxPrice;
+  if (state.keyword) {
+    document.getElementById("shop-title").textContent = 'Results for "' + state.keyword + '"';
+  }
+
+  document.getElementById("sort-select").addEventListener("change", (event) => {
+    state.sort = event.target.value;
     state.page = 1;
     loadProducts();
   });
+  document.getElementById("price-form").addEventListener("submit", applyPriceFilter);
+  document.getElementById("clear-filters").addEventListener("click", clearFilters);
 
-  document.getElementById("price-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    state.minPrice = document.getElementById("min-price").value;
-    state.maxPrice = document.getElementById("max-price").value;
-    state.page = 1;
-    loadProducts();
-  });
-
-  await loadCategoryFilters();
+  await Promise.all([loadCategories(), loadBrands()]);
   await loadProducts();
 });
 
-async function loadCategoryFilters() {
+async function loadCategories() {
+  const list = document.getElementById("filter-categories");
   try {
     const categories = await Api.get("/categories");
-    const list = document.getElementById("filter-categories");
-    const items = categories
+    categories.forEach((item) => names.categories.set(item._id, item.name));
+    renderFilterList(list, categories, "category", "All categories");
+  } catch {
+    list.innerHTML = `<li>Categories unavailable</li>`;
+  }
+}
+
+async function loadBrands() {
+  const list = document.getElementById("filter-brands");
+  try {
+    const brands = await Api.get("/brands");
+    brands.forEach((item) => names.brands.set(item._id, item.name));
+    renderFilterList(list, brands, "brand", "All brands");
+  } catch {
+    list.innerHTML = `<li>Brands unavailable</li>`;
+  }
+}
+
+function renderFilterList(list, items, key, allLabel) {
+  list.innerHTML =
+    `<li><button type="button" data-filter-value="" class="${state[key] ? "" : "active"}">${allLabel}</button></li>` +
+    items
       .map(
-        (c) =>
-          `<li><a href="#" data-cat="${c._id}" class="${state.category === c._id ? "active" : ""}">${escapeHtml(c.name)}</a></li>`
+        (item) =>
+          `<li><button type="button" data-filter-value="${item._id}" class="${state[key] === item._id ? "active" : ""}">${escapeHtml(item.name)}</button></li>`
       )
       .join("");
-    list.innerHTML = `<li><a href="#" data-cat="" class="${state.category === "" ? "active" : ""}">All categories</a></li>${items}`;
-
-    list.querySelectorAll("a").forEach((a) => {
-      a.addEventListener("click", (e) => {
-        e.preventDefault();
-        state.category = a.dataset.cat;
-        state.page = 1;
-        list.querySelectorAll("a").forEach((x) => x.classList.remove("active"));
-        a.classList.add("active");
-        loadProducts();
-      });
+  list.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state[key] = button.dataset.filterValue;
+      state.page = 1;
+      list.querySelectorAll("button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      loadProducts();
     });
-  } catch (e) {
-    /* silently ignore filter load errors */
+  });
+}
+
+function applyPriceFilter(event) {
+  event.preventDefault();
+  const min = document.getElementById("min-price").value;
+  const max = document.getElementById("max-price").value;
+  const error = document.getElementById("price-error");
+  if (min && max && Number(min) > Number(max)) {
+    error.textContent = "Minimum price cannot be greater than maximum price.";
+    return;
   }
+  error.textContent = "";
+  state.minPrice = min;
+  state.maxPrice = max;
+  state.page = 1;
+  loadProducts();
+}
+
+function clearFilters() {
+  Object.assign(state, {
+    category: "",
+    brand: "",
+    keyword: "",
+    featured: "",
+    minPrice: "",
+    maxPrice: "",
+    sort: "newest",
+    page: 1,
+  });
+  document.getElementById("min-price").value = "";
+  document.getElementById("max-price").value = "";
+  document.getElementById("sort-select").value = "newest";
+  document.querySelectorAll(".filters-list button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.filterValue === "");
+  });
+  document.getElementById("shop-title").textContent = "Shop useful things";
+  loadProducts();
+}
+
+function buildQuery() {
+  const query = new URLSearchParams();
+  for (const key of ["category", "brand", "keyword", "featured", "minPrice", "maxPrice", "sort"]) {
+    if (state[key]) query.set(key, state[key]);
+  }
+  query.set("page", state.page);
+  query.set("limit", state.limit);
+  return query;
 }
 
 async function loadProducts() {
   const grid = document.getElementById("product-grid");
   const resultCount = document.getElementById("result-count");
-  grid.innerHTML = `<span class="spinner">Loading products…</span>`;
-
-  const qs = new URLSearchParams();
-  if (state.category) qs.set("category", state.category);
-  if (state.keyword) qs.set("keyword", state.keyword);
-  if (state.featured) qs.set("featured", state.featured);
-  if (state.minPrice) qs.set("minPrice", state.minPrice);
-  if (state.maxPrice) qs.set("maxPrice", state.maxPrice);
-  qs.set("sort", state.sort);
-  qs.set("page", state.page);
-  qs.set("limit", state.limit);
+  grid.innerHTML = Array.from({ length: 8 }, () => `<div class="product-skeleton"></div>`).join("");
+  const query = buildQuery();
+  window.history.replaceState({}, "", "products.html?" + query.toString());
 
   try {
-    const data = await Api.get(`/products?${qs.toString()}`);
-    resultCount.textContent = `${data.total} product${data.total === 1 ? "" : "s"} found`;
-
-    if (data.products.length === 0) {
-      grid.innerHTML = `<div class="empty-state">No products match these filters. Try clearing them.</div>`;
-    } else {
-      grid.innerHTML = data.products.map(productCardHtml).join("");
-    }
-
+    const data = await Api.get("/products?" + query.toString());
+    resultCount.textContent = data.total + " product" + (data.total === 1 ? "" : "s");
+    grid.innerHTML = data.products.length
+      ? data.products.map(productCardHtml).join("")
+      : `<div class="empty-state"><h2>No matches found</h2><p>Try removing a filter or widening the price range.</p></div>`;
+    renderActiveFilters();
     renderPagination(data.page, data.pages);
-  } catch (e) {
-    resultCount.textContent = "";
-    grid.innerHTML = `<div class="empty-state">Could not load products: ${escapeHtml(e.message)}</div>`;
+  } catch (error) {
+    resultCount.textContent = "Products unavailable";
+    grid.innerHTML = `<div class="empty-state"><h2>We could not load the catalog</h2><p>${escapeHtml(error.message)}</p></div>`;
   }
 }
 
+function renderActiveFilters() {
+  const labels = [];
+  if (state.category) labels.push(names.categories.get(state.category) || "Category");
+  if (state.brand) labels.push(names.brands.get(state.brand) || "Brand");
+  if (state.featured === "true") labels.push("Featured");
+  if (state.minPrice) labels.push("From " + money(state.minPrice));
+  if (state.maxPrice) labels.push("Up to " + money(state.maxPrice));
+  document.getElementById("active-filters").innerHTML = labels
+    .map((label) => `<span>${escapeHtml(label)}</span>`)
+    .join("");
+}
+
 function renderPagination(page, pages) {
-  const el = document.getElementById("pagination");
+  const element = document.getElementById("pagination");
   if (pages <= 1) {
-    el.innerHTML = "";
+    element.innerHTML = "";
     return;
   }
-  let html = "";
-  for (let i = 1; i <= pages; i++) {
-    html += `<button class="${i === page ? "active" : ""}" data-page="${i}">${i}</button>`;
+  const visible = [];
+  for (let number = 1; number <= pages; number += 1) {
+    if (number === 1 || number === pages || Math.abs(number - page) <= 1) visible.push(number);
   }
-  el.innerHTML = html;
-  el.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.page = Number(btn.dataset.page);
+  let previous = 0;
+  const controls = [];
+  for (const number of visible) {
+    if (number - previous > 1) controls.push(`<span aria-hidden="true">…</span>`);
+    controls.push(
+      `<button type="button" data-page="${number}" class="${number === page ? "active" : ""}" aria-current="${number === page ? "page" : "false"}">${number}</button>`
+    );
+    previous = number;
+  }
+  element.innerHTML = controls.join("");
+  element.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.page = Number(button.dataset.page);
       loadProducts();
       window.scrollTo({ top: 0, behavior: "smooth" });
     });

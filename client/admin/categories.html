@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Manage Categories — Norda Admin</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/style.css" />
   <link rel="stylesheet" href="../css/admin.css" />
 </head>
@@ -13,11 +13,11 @@
     <aside class="admin-sidebar" id="admin-sidebar"></aside>
     <main class="admin-main">
       <div class="admin-topbar">
-        <h1>Categories</h1>
-        <button class="btn btn-primary btn-sm" id="new-category-btn">+ New category</button>
+        <div><span class="eyebrow">Catalog</span><h1>Categories</h1><p>Organize products into clear storefront collections.</p></div>
+        <div class="admin-topbar-actions"><span id="admin-topbar-user"></span><button class="btn btn-primary btn-sm" id="new-category-btn">+ New category</button></div>
       </div>
       <div id="alert-box"></div>
-      <div id="categories-root">
+      <div id="categories-root" class="admin-panel">
         <span class="spinner">Loading categories…</span>
       </div>
     </main>
